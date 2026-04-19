@@ -1,0 +1,15 @@
+[submodule "include/fc/crypto/webauthn_json"]
+	path = include/fc/crypto/webauthn_json
+	url = https://github.com/Tencent/rapidjson/
+[submodule "secp256k1/secp256k1"]
+	path = secp256k1/secp256k1
+	url = https://github.com/bitcoin-core/secp256k1
+[submodule "libraries/bn256"]
+	path = libraries/bn256
+	url = https://github.com/AntelopeIO/bn256
+[submodule "libraries/bls12-381"]
+	path = libraries/bls12-381
+	url = https://github.com/AntelopeIO/bls12-381
+[submodule "libraries/boringssl/bssl"]
+	path = libraries/boringssl/bssl
+	url = https://github.com/google/boringssl.git
