@@ -1,6 +1,7 @@
 #pragma once
 #include <fc/utility.hpp>
 #include <fc/exception/exception.hpp>
+#include <bit>
 #include <string.h>
 #include <stdint.h>
 #include <type_traits>
