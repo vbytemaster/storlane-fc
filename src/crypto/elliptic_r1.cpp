@@ -311,7 +311,7 @@ namespace fc { namespace crypto { namespace r1 {
       }
     }
 
-    public_key_data recover_public_key_data(const compact_signature& c, const fc::sha256& digest, bool /*check_canonical*/)
+    public_key_data recover_public_key_data(const compact_signature& c, const fc::sha256& digest, bool check_canonical)
     {
       int nV = c.data[0];
       if(nV < 27 || nV >= 35)
@@ -327,7 +327,7 @@ namespace fc { namespace crypto { namespace r1 {
       ssl_bignum order, halforder;
       FC_ASSERT(EC_GROUP_get_order(group, order, ctx));
       BN_rshift1(halforder, order);
-      if(BN_cmp(s, halforder) > 0)
+      if(check_canonical && BN_cmp(s, halforder) > 0)
         FC_THROW_EXCEPTION(exception, "invalid high s-value encountered in r1 signature");
       ECDSA_SIG_set0(sig, r, s);
       if(nV >= 31)
