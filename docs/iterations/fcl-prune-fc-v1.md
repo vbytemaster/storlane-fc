@@ -11,10 +11,10 @@ Crypto is intentionally preserved. Network code from the old FC layer is intenti
 ## Keep
 
 - All current crypto code and tests: BLS12-381, BN256, GMP-backed modular arithmetic, K1/secp256k1, R1/WebAuthn, AES, hashes, random, base58/base64/hex, key and signature wrappers.
-- `fc::raw::pack/unpack`, datastream, varint, and raw compatibility tests.
-- `fc::variant`, `fc::variant_object`, `fc::json`, reflection compatibility, and related tests.
-- `fc::exception`, `FC_CAPTURE_*`, log message, logger, and the minimal console appender path needed for compatibility diagnostics.
-- `fc::time_point`, `fc::time_point_sec`, string, utf8, filesystem, static variant, and scalar utilities.
+- `fcl::raw::pack/unpack`, datastream, varint, and raw compatibility tests.
+- `fcl::variant`, `fcl::variant_object`, `fcl::json`, reflection compatibility, and related tests.
+- `fcl::exception`, `FCL_CAPTURE_*`, log message, logger, and the minimal console appender path needed for compatibility diagnostics.
+- `fcl::time_point`, `fcl::time_point_sec`, string, utf8, filesystem, static variant, and scalar utilities.
 - Boost.Asio and Boost.Beast remain allowed dependencies for future FCL runtime/network targets, even if they are removed from the legacy `fc` target linkage.
 
 ## Remove In This Pass
@@ -44,10 +44,10 @@ Crypto is intentionally preserved. Network code from the old FC layer is intenti
 ## Not In This Pass
 
 - No Boost.Describe rewrite.
-- No `FC_REFLECT` migration.
+- No `FCL_REFLECT` migration.
 - No repository rename.
-- No target rename from `fc` to `fcl_*`.
-- No new `libraries/<lib>/include/fcl/...` structure.
+- Target rename to `fcl_*` was deferred to the structure split pass.
+- New `libraries/<lib>/include/fcl/...` structure was deferred to the structure split pass.
 - No downstream library import.
 - No crypto pruning.
 
@@ -57,7 +57,7 @@ Required build and tests:
 
 ```sh
 cmake -S . -B build/fcl-prune-debug -G Ninja -DBUILD_TESTING=ON
-cmake --build build/fcl-prune-debug -j 1 --target fc test_fc
+cmake --build build/fcl-prune-debug -j 1 --target fcl test_fcl
 ctest --test-dir build/fcl-prune-debug --output-on-failure --timeout 180
 ```
 

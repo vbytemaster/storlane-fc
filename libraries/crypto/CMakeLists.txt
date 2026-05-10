@@ -1,0 +1,24 @@
+file(GLOB FCL_CRYPTO_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+
+add_library(fcl_crypto OBJECT ${FCL_CRYPTO_SOURCES})
+
+target_include_directories(
+   fcl_crypto PUBLIC
+      ${FCL_PUBLIC_INCLUDE_DIRS}
+      "${PROJECT_SOURCE_DIR}/vendor/rapidjson/include"
+)
+
+target_compile_definitions(
+   fcl_crypto
+   PUBLIC OPENSSL_API_COMPAT=0x30000000L
+          OPENSSL_NO_DEPRECATED
+)
+
+target_link_libraries(
+   fcl_crypto PUBLIC
+      Boost::headers
+      GMP::gmp
+      OpenSSL::Crypto
+      secp256k1
+      bls12-381
+)

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.31)
 
-project(storlane-fc VERSION 0.1.0 LANGUAGES C CXX)
+project(storlane-fc VERSION 0.1.0 LANGUAGES C CXX ASM)
 
 include(GNUInstallDirs)
 
@@ -8,12 +8,13 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
    include(CTest)
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(FC_ENABLE_VENDOR_TESTS "Build donor dependency tests and benchmarks" OFF)
+option(FCL_ENABLE_MODULES "Build FCL public module interfaces when supported" ON)
+option(FCL_ENABLE_VENDOR_TESTS "Build donor dependency tests and benchmarks" OFF)
 
 if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
    add_compile_options(-fdiagnostics-color=always)
@@ -44,7 +45,7 @@ find_package(
 
 find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
 
-function(fc_add_header_only_boost_target component)
+function(fcl_add_header_only_boost_target component)
    if(NOT TARGET Boost::${component})
       add_library(Boost::${component} INTERFACE IMPORTED)
       set_property(
@@ -54,13 +55,13 @@ function(fc_add_header_only_boost_target component)
    endif()
 endfunction()
 
-fc_add_header_only_boost_target(asio)
-fc_add_header_only_boost_target(beast)
-fc_add_header_only_boost_target(crc)
-fc_add_header_only_boost_target(dll)
-fc_add_header_only_boost_target(interprocess)
-fc_add_header_only_boost_target(multi_index)
-fc_add_header_only_boost_target(multiprecision)
+fcl_add_header_only_boost_target(asio)
+fcl_add_header_only_boost_target(beast)
+fcl_add_header_only_boost_target(crc)
+fcl_add_header_only_boost_target(dll)
+fcl_add_header_only_boost_target(interprocess)
+fcl_add_header_only_boost_target(multi_index)
+fcl_add_header_only_boost_target(multiprecision)
 
 if(NOT TARGET Boost::included_unit_test_framework)
    add_library(Boost::included_unit_test_framework INTERFACE IMPORTED)
@@ -71,154 +72,153 @@ if(NOT TARGET Boost::included_unit_test_framework)
 endif()
 
 find_package(Git QUIET)
-set(FC_GIT_REVISION_SHA "unknown")
-set(FC_GIT_REVISION_UNIX_TIMESTAMP 0)
+set(FCL_GIT_REVISION_SHA "unknown")
+set(FCL_GIT_REVISION_UNIX_TIMESTAMP 0)
 
 if(Git_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
-   set(_fc_git_rev_parse_result 1)
    execute_process(
       COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-      OUTPUT_VARIABLE FC_GIT_REVISION_SHA
-      RESULT_VARIABLE _fc_git_rev_parse_result
+      OUTPUT_VARIABLE FCL_GIT_REVISION_SHA
+      RESULT_VARIABLE _fcl_git_rev_parse_result
       OUTPUT_STRIP_TRAILING_WHITESPACE
       ERROR_QUIET
    )
-   if(NOT _fc_git_rev_parse_result EQUAL 0)
-      set(FC_GIT_REVISION_SHA "unknown")
+   if(NOT _fcl_git_rev_parse_result EQUAL 0)
+      set(FCL_GIT_REVISION_SHA "unknown")
    endif()
 
-   set(_fc_git_log_result 1)
    execute_process(
       COMMAND "${GIT_EXECUTABLE}" log -1 --format=%ct
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-      OUTPUT_VARIABLE FC_GIT_REVISION_UNIX_TIMESTAMP
-      RESULT_VARIABLE _fc_git_log_result
+      OUTPUT_VARIABLE FCL_GIT_REVISION_UNIX_TIMESTAMP
+      RESULT_VARIABLE _fcl_git_log_result
       OUTPUT_STRIP_TRAILING_WHITESPACE
       ERROR_QUIET
    )
-   if(NOT _fc_git_log_result EQUAL 0)
-      set(FC_GIT_REVISION_UNIX_TIMESTAMP 0)
+   if(NOT _fcl_git_log_result EQUAL 0)
+      set(FCL_GIT_REVISION_UNIX_TIMESTAMP 0)
    endif()
 endif()
-
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/src")
-configure_file(
-   "${CMAKE_CURRENT_SOURCE_DIR}/src/git_revision.cpp.in"
-   "${CMAKE_CURRENT_BINARY_DIR}/src/git_revision.cpp"
-   @ONLY
-)
-
-add_subdirectory(secp256k1)
-add_subdirectory(libraries/bn256/src)
-# Keep donor submodules clean and avoid building their standalone tests/benchmarks
-# as part of the default fc build.
-add_subdirectory(libraries/bls12-381 EXCLUDE_FROM_ALL)
-
-if(NOT FC_ENABLE_VENDOR_TESTS)
-   file(
-      WRITE "${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake"
-      "set(CTEST_CUSTOM_TESTS_IGNORE bls12-381 bls12-381-nobmi2)\n"
-   )
-endif()
-
-set(
-   fc_sources
-   src/uint128.cpp
-   src/variant.cpp
-   src/exception.cpp
-   src/variant_object.cpp
-   src/string.cpp
-   src/time.cpp
-   src/mock_time.cpp
-   src/utf8.cpp
-   src/io/datastream.cpp
-   src/io/json.cpp
-   src/io/varint.cpp
-   src/io/fstream.cpp
-   src/filesystem.cpp
-   src/log/log_message.cpp
-   src/log/logger.cpp
-   src/log/appender.cpp
-   src/log/console_appender.cpp
-   src/log/logger_config.cpp
-   src/crypto/_digest_common.cpp
-   src/crypto/aes.cpp
-   src/crypto/crc.cpp
-   src/crypto/city.cpp
-   src/crypto/base58.cpp
-   src/crypto/bigint.cpp
-   src/crypto/hex.cpp
-   src/crypto/sha1.cpp
-   src/crypto/sha3.cpp
-   src/crypto/ripemd160.cpp
-   src/crypto/sha256.cpp
-   src/crypto/sha224.cpp
-   src/crypto/sha512.cpp
-   src/crypto/elliptic_common.cpp
-   src/crypto/elliptic_impl_priv.cpp
-   src/crypto/elliptic_secp256k1.cpp
-   src/crypto/elliptic_r1.cpp
-   src/crypto/elliptic_webauthn.cpp
-   src/crypto/rand.cpp
-   src/crypto/public_key.cpp
-   src/crypto/private_key.cpp
-   src/crypto/signature.cpp
-   src/crypto/bls_private_key.cpp
-   src/crypto/bls_public_key.cpp
-   src/crypto/bls_signature.cpp
-   src/crypto/bls_utils.cpp
-   src/crypto/modular_arithmetic.cpp
-   src/crypto/blake2.cpp
-   src/crypto/k1_recover.cpp
-   "${CMAKE_CURRENT_BINARY_DIR}/src/git_revision.cpp"
-)
-
-file(GLOB_RECURSE fc_headers "${CMAKE_CURRENT_SOURCE_DIR}" *.hpp *.h)
-
-add_library(fc ${fc_sources} ${fc_headers})
-
-target_compile_definitions(
-   fc
-   PUBLIC OPENSSL_API_COMPAT=0x30000000L
-          OPENSSL_NO_DEPRECATED
-)
 
 find_path(GMP_INCLUDE_DIR NAMES gmp.h)
 find_library(GMP_LIBRARY gmp)
 if(NOT GMP_LIBRARY MATCHES ${CMAKE_SHARED_LIBRARY_SUFFIX})
    message(FATAL_ERROR "GMP shared library not found")
 endif()
-set(gmp_library_type SHARED)
 message(STATUS "GMP: ${GMP_LIBRARY}, ${GMP_INCLUDE_DIR}")
-add_library(GMP::gmp ${gmp_library_type} IMPORTED)
+add_library(GMP::gmp SHARED IMPORTED)
 set_target_properties(
    GMP::gmp PROPERTIES
    IMPORTED_LOCATION ${GMP_LIBRARY}
    INTERFACE_INCLUDE_DIRECTORIES ${GMP_INCLUDE_DIR}
 )
 
-target_link_libraries(fc PUBLIC GMP::gmp)
-
-target_include_directories(fc PUBLIC include)
-
-set_source_files_properties(
-   src/crypto/elliptic_webauthn.cpp
-   PROPERTIES INCLUDE_DIRECTORIES
-              "${CMAKE_CURRENT_SOURCE_DIR}/include/fc/crypto/webauthn_json/include"
+set(
+   FCL_PUBLIC_INCLUDE_DIRS
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/core/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/exception/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/reflect/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/variant/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/io/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/raw/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/json/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/log/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/crypto/include"
 )
 
-if(WIN32)
-   target_link_libraries(fc PUBLIC ws2_32 mswsock userenv)
+add_library(secp256k1-internal INTERFACE)
+target_include_directories(secp256k1-internal INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1/src")
+target_compile_definitions(
+   secp256k1-internal INTERFACE
+      ENABLE_MODULE_RECOVERY=1
+      COMB_BLOCKS=43
+      COMB_TEETH=6
+      ECMULT_WINDOW_SIZE=15
+      SECP256K1_STATIC=1
+)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
+   target_compile_definitions(secp256k1-internal INTERFACE USE_ASM_X86_64=1)
+endif()
+target_compile_options(secp256k1-internal INTERFACE -Wno-unused-function)
+
+add_library(
+   secp256k1 STATIC
+   vendor/secp256k1/src/secp256k1.c
+   vendor/secp256k1/src/precomputed_ecmult.c
+   vendor/secp256k1/src/precomputed_ecmult_gen.c
+)
+target_include_directories(
+   secp256k1 PUBLIC
+      "${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1"
+      "${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1/include"
+)
+target_link_libraries(secp256k1 PRIVATE secp256k1-internal)
+
+if(FCL_ENABLE_VENDOR_TESTS)
+   add_executable(secp256k1-bench vendor/secp256k1/src/bench.c)
+   target_link_libraries(secp256k1-bench secp256k1 secp256k1-internal)
+
+   add_executable(secp256k1-tests vendor/secp256k1/src/tests.c)
+   target_link_libraries(secp256k1-tests secp256k1 secp256k1-internal)
+   add_test(NAME secp256k1-tests COMMAND secp256k1-tests)
+
+   add_executable(secp256k1-exhaustive-tests vendor/secp256k1/src/tests_exhaustive.c)
+   target_link_libraries(secp256k1-exhaustive-tests secp256k1 secp256k1-internal)
+   add_test(NAME secp256k1-exhaustive-tests COMMAND secp256k1-exhaustive-tests)
 endif()
 
-if(APPLE)
-   find_library(security_framework Security)
-   find_library(corefoundation_framework CoreFoundation)
+add_subdirectory(vendor/bn256/src)
+add_subdirectory(vendor/bls12-381 EXCLUDE_FROM_ALL)
+
+if(NOT FCL_ENABLE_VENDOR_TESTS)
+   file(
+      WRITE "${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake"
+      "set(CTEST_CUSTOM_TESTS_IGNORE bls12-381 bls12-381-nobmi2)\n"
+   )
 endif()
+
+add_subdirectory(libraries/core)
+add_subdirectory(libraries/exception)
+add_subdirectory(libraries/reflect)
+add_subdirectory(libraries/variant)
+add_subdirectory(libraries/io)
+add_subdirectory(libraries/raw)
+add_subdirectory(libraries/json)
+add_subdirectory(libraries/log)
+add_subdirectory(libraries/crypto)
+
+add_library(
+   fcl STATIC
+   $<TARGET_OBJECTS:fcl_core>
+   $<TARGET_OBJECTS:fcl_exception>
+   $<TARGET_OBJECTS:fcl_variant>
+   $<TARGET_OBJECTS:fcl_io>
+   $<TARGET_OBJECTS:fcl_json>
+   $<TARGET_OBJECTS:fcl_log>
+   $<TARGET_OBJECTS:fcl_crypto>
+)
+
+target_include_directories(fcl PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS})
+
+target_compile_definitions(
+   fcl
+   PUBLIC OPENSSL_API_COMPAT=0x30000000L
+          OPENSSL_NO_DEPRECATED
+)
 
 target_link_libraries(
-   fc PUBLIC
+   fcl PUBLIC
+      fcl_core
+      fcl_exception
+      fcl_reflect
+      fcl_variant
+      fcl_io
+      fcl_raw
+      fcl_json
+      fcl_log
+      fcl_crypto
+      GMP::gmp
       Boost::date_time
       Boost::chrono
       Boost::iostreams
@@ -234,27 +234,37 @@ target_link_libraries(
       ${CMAKE_DL_LIBS}
       secp256k1
       bls12-381
-      ${security_framework}
-      ${corefoundation_framework}
 )
 
+if(WIN32)
+   target_link_libraries(fcl PUBLIC ws2_32 mswsock userenv)
+endif()
+
+if(APPLE)
+   find_library(security_framework Security)
+   find_library(corefoundation_framework CoreFoundation)
+   target_link_libraries(fcl PUBLIC ${security_framework} ${corefoundation_framework})
+endif()
+
 if(DEFINED BUILD_TESTING AND BUILD_TESTING)
-   add_subdirectory(test)
+   add_subdirectory(tests)
 endif()
 
 install(
-   TARGETS fc
+   TARGETS fcl
    LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR} COMPONENT dev EXCLUDE_FROM_ALL
    ARCHIVE DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR} COMPONENT dev EXCLUDE_FROM_ALL
 )
 
 install(
-   DIRECTORY include/fc
+   DIRECTORY libraries/core/include/fcl
+             libraries/exception/include/fcl
+             libraries/reflect/include/fcl
+             libraries/variant/include/fcl
+             libraries/io/include/fcl
+             libraries/raw/include/fcl
+             libraries/json/include/fcl
+             libraries/log/include/fcl
+             libraries/crypto/include/fcl
    DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR} COMPONENT dev EXCLUDE_FROM_ALL
-)
-
-install(
-   TARGETS bls12-381 ARCHIVE
-   DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}" COMPONENT dev EXCLUDE_FROM_ALL
-   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/bls12-381" COMPONENT dev EXCLUDE_FROM_ALL
 )

@@ -16,7 +16,7 @@ FCL не должен быть привязан к Storlane, Spring, storage, cl
 FCL должен дать разработчику удобный набор инструментов для:
 
 - описания типов и сериализации;
-- бинарной совместимости с существующим `fc::raw::pack`;
+- бинарной совместимости со старым FC raw byte layout;
 - работы с YAML/JSON и валидацией конфигураций;
 - криптографии;
 - асинхронного выполнения;
@@ -206,7 +206,7 @@ FCL_DESCRIBE_ENUM(mode, read, write, admin)
 
 На первом этапе они могут быть thin wrappers над Boost.Describe.
 
-Важно: если мы хотим compatibility с `FC_REFLECT(TYPE, (a)(b)(c))`, надо помнить, что синтаксис FC и Boost.Describe отличается. Поэтому старый `FC_REFLECT` лучше оставить в compatibility layer или мигрировать call sites, а не пытаться грубо `#define FC_REFLECT BOOST_DESCRIBE_STRUCT`.
+Важно: если мы хотим временную совместимость с `FCL_REFLECT(TYPE, (a)(b)(c))`, надо помнить, что синтаксис старого FC reflection и Boost.Describe отличается. Поэтому временный `FCL_REFLECT` лучше оставить как transitional layer или мигрировать call sites, а не пытаться грубо `#define FCL_REFLECT BOOST_DESCRIBE_STRUCT`.
 
 ### 4.3 Отказ от FC reflect как основной модели
 
@@ -215,7 +215,7 @@ FC reflect не должен быть canonical reflection FCL.
 Оставить только то, что нужно для:
 
 - совместимости старых вызовов;
-- `fc::raw::pack`;
+- FCL raw serialization;
 - legacy типов;
 - миграции.
 
@@ -228,15 +228,15 @@ FC reflect не должен быть canonical reflection FCL.
 
 ---
 
-## 5. Бинарная сериализация и совместимость с `fc::raw::pack`
+## 5. Бинарная сериализация и совместимость со старым FC byte layout
 
 ### 5.1 Цель
 
-Сохранить compatibility API:
+Сохранить новый FCL API:
 
 ```cpp
-fc::raw::pack(value)
-fc::raw::unpack<T>(bytes)
+fcl::raw::pack(value)
+fcl::raw::unpack<T>(bytes)
 ```
 
 Но внутренне перевести сериализацию на FCL implementation:
@@ -251,7 +251,7 @@ fcl::raw::unpack<T>(bytes)
 Для типов, которые уже сериализовались через FC, надо доказать:
 
 ```text
-old fc::raw::pack(T) == new fc::raw::pack(T)
+old FC bytes(T) == new FCL bytes(T)
 ```
 
 Это hard gate.
@@ -388,7 +388,7 @@ config.yml:18: private-key: forbidden in production profile; use vault key ref
 config.yml:24: unknown option "wroker-threads"; did you mean "worker-threads"?
 ```
 
-Ошибки должны быть std‑based, не `fc::exception`.
+Ошибки должны быть std‑based, не `fcl::exception`.
 
 ### 6.5 Redaction
 
@@ -451,7 +451,7 @@ auto value = fcl::json::decode<T>(json);
 
 ### 7.1 Проблема старого подхода
 
-Старый `FC_CAPTURE_AND_RETHROW` удобен, но привязан к `fc::exception`.
+Старый `FCL_CAPTURE_AND_RETHROW` удобен, но привязан к `fcl::exception`.
 
 Для FCL нужен похожий по удобству механизм, но основанный на `std::exception`, `std::source_location`, structured context и typed error categories.
 
@@ -463,7 +463,7 @@ auto value = fcl::json::decode<T>(json);
 - сохранять исходное исключение;
 - поддерживать `std::source_location`;
 - работать со `std::runtime_error`, `std::system_error`, typed errors;
-- не требовать `fc::exception`;
+- не требовать `fcl::exception`;
 - позволять логировать structured fields;
 - быть безопасными для redaction.
 
@@ -528,7 +528,7 @@ fcl::ctx("token", value, fcl::sensitive)
 import fcl.crypto;
 ```
 
-Legacy namespace `fc::crypto` оставить как compatibility.
+Crypto namespace lives under `fcl::crypto`; старый FC source namespace больше не является целью после structural split.
 
 ### 8.2 Перенести generic crypto из Storlane
 
@@ -873,7 +873,7 @@ tests/unit/quic
 tests/unit/p2p
 tests/unit/app
 tests/unit/tui
-tests/unit/fc_compat
+tests/unit/fcl_compat
 ```
 
 ### 16.2 Обязательные тестовые группы
@@ -957,7 +957,7 @@ tests/unit/fc_compat
 
 - Boost.Describe как основной reflection layer;
 - `fcl.raw`;
-- `fc::raw::pack` compatibility;
+- old FC raw byte layout compatibility;
 - golden tests.
 
 ### Этап 3 — crypto
@@ -1034,7 +1034,7 @@ tests/unit/fc_compat
 FCL v1 можно считать готовым, когда:
 
 1. новый код использует Boost.Describe для описания типов;
-2. `fc::raw::pack` compatibility доказана golden tests;
+2. old FC raw byte layout compatibility доказана golden tests;
 3. crypto tests зелёные на OpenSSL 3+;
 4. runtime/scheduler стабилен;
 5. YAML/JSON decode/encode/validation работают через described types;
@@ -1053,11 +1053,11 @@ FCL v1 можно считать готовым, когда:
 Ключевые решения:
 
 - основной reflection — Boost.Describe;
-- `fc::raw::pack` compatibility сохранить;
+- old FC raw byte layout compatibility сохранить;
 - FC crypto сохранить и очистить;
 - FC reflect как canonical API выпилить или оставить только в compatibility;
 - YAML/JSON/validation строить поверх Boost.Describe + FCL schema rules;
-- исключения — std‑based, с контекстом и redaction, без зависимости от `fc::exception`;
+- исключения — std‑based, с контекстом и redaction, без зависимости от `fcl::exception`;
 - перенести из Storlane generic библиотеки: asio/runtime, network, app, crypto, tui, config/yml/log;
 - OpenSSL 3+;
 - C++23;

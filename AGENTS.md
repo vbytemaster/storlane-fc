@@ -33,16 +33,15 @@ The repository must stay neutral. Public APIs must not contain downstream produc
   - `fcl_net_quic`
   - `fcl_net_p2p`
   - `fcl_tui`
-  - `fcl_fc_compat`
 - Heavy classes that own sockets, event loops, crypto contexts, terminal state, or other external resources should use pimpl.
 - Value types, protocol records, and simple POD-like structs should not use pimpl.
 
 ## Reflection And Serialization
 
 - New canonical reflection uses Boost.Describe or thin FCL wrappers over it.
-- Legacy `FC_REFLECT` remains compatibility only.
-- Do not map `FC_REFLECT` directly to Boost.Describe with a broad macro alias.
-- Binary serialization compatibility with `fc::raw::pack` is a hard gate.
+- `FCL_REFLECT` remains a temporary textual macro layer until the Boost.Describe pass.
+- Do not map `FCL_REFLECT` directly to Boost.Describe with a broad macro alias.
+- Binary serialization compatibility with the old FC raw byte layout is a hard gate.
 - Any replacement for raw serialization must prove byte-for-byte compatibility with golden tests.
 - Reflection field order must be explicit and stable.
 
@@ -57,7 +56,7 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 ## Errors And Logging
 
 - New error APIs should be `std`-based and support structured context.
-- Legacy `fc::exception` and `FC_CAPTURE_*` remain compatibility only.
+- `fcl::exception` and `FCL_CAPTURE_*` remain transitional APIs until the std-based error pass.
 - New context capture must support source location and redaction.
 - Logging core should stay small: console/file/JSONL-style sinks and structured fields.
 - External logging integrations must be optional adapters, not core dependencies.
@@ -77,7 +76,7 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Async APIs for heavy operations should use `boost::asio::awaitable<T>`.
 - Synchronous wrappers are allowed, but must not be the only API for heavy operations.
 - Boost.Asio and Boost.Beast are valid dependencies for future runtime and network targets.
-- Legacy networking code from the old compatibility target must not define the new network API.
+- Legacy networking code from the old codebase must not define the new network API.
 - Runtime workers must have explicit cancellation, bounded queues where needed, and deterministic shutdown.
 - Do not introduce `std::async`, ad hoc polling loops, or unmanaged background threads as core runtime behavior.
 
@@ -101,7 +100,7 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 
 - Keep dependencies explicit and target-scoped.
 - Optional features must be behind CMake options.
-- Avoid dependencies in the compatibility target if they are only needed by future FCL targets.
+- Avoid dependencies in low-level targets if they are only needed by future FCL targets.
 - Donor or reference code must not become a build dependency unless explicitly accepted as a dependency.
 
 ## Tests
@@ -114,7 +113,10 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 
 ## Current Iteration Guardrails
 
-- Keep the repository name and legacy compatibility target unchanged until the structure migration is planned.
-- Do not introduce Boost.Describe rewrites before the compatibility test baseline exists.
+- Keep the repository name unchanged until repository migration is planned.
+- Do not introduce Boost.Describe rewrites before the raw binary compatibility test baseline exists.
 - Do not move neutral libraries from downstream projects until the FCL target structure exists.
 - Do not remove crypto primitives in the first pruning pass.
+- Public headers must live under `libraries/<lib>/include/fcl/...`; root `include/` and old `include/fc/` are forbidden.
+- Implementation `.cpp` files live directly in `libraries/<lib>/`; nested `src/` directories are forbidden for FCL-owned libraries.
+- Third-party source and submodules live under root `vendor/`; `libraries/` contains only FCL-owned code.
