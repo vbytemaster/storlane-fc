@@ -6,12 +6,8 @@ add_executable( test_fc
         crypto/test_k1_recover.cpp
         crypto/test_modular_arithmetic.cpp
         crypto/test_webauthn.cpp
-        io/test_cfile.cpp
         io/test_json.cpp
-        io/test_random_access_file.cpp
         io/test_raw.cpp
-        io/test_tracked_storage.cpp
-        network/test_message_buffer.cpp
         scoped_exit/test_scoped_exit.cpp
         static_variant/test_static_variant.cpp
         variant/test_variant.cpp
@@ -20,7 +16,6 @@ add_executable( test_fc
         test_base64.cpp
         test_escape_str.cpp
         test_bls.cpp
-        test_ordered_diff.cpp
         main.cpp
         )
 target_link_libraries( test_fc fc Boost::included_unit_test_framework)

@@ -136,14 +136,11 @@ set(
    src/io/json.cpp
    src/io/varint.cpp
    src/io/fstream.cpp
-   src/io/console.cpp
    src/filesystem.cpp
-   src/interprocess/file_mapping.cpp
    src/log/log_message.cpp
    src/log/logger.cpp
    src/log/appender.cpp
    src/log/console_appender.cpp
-   src/log/dmlog_appender.cpp
    src/log/logger_config.cpp
    src/crypto/_digest_common.cpp
    src/crypto/aes.cpp
@@ -174,10 +171,6 @@ set(
    src/crypto/modular_arithmetic.cpp
    src/crypto/blake2.cpp
    src/crypto/k1_recover.cpp
-   src/network/url.cpp
-   src/network/http/http_client.cpp
-   src/compress/zlib.cpp
-   src/log/gelf_appender.cpp
    "${CMAKE_CURRENT_BINARY_DIR}/src/git_revision.cpp"
 )
 
@@ -207,10 +200,6 @@ set_target_properties(
 
 target_link_libraries(fc PUBLIC GMP::gmp)
 
-# fc picks up a dependency on zlib via Boost::iostreams, however in some versions of
-# cmake/boost the Boost::iostreams target does not add zlib itself, so keep it explicit.
-find_package(ZLIB REQUIRED)
-
 target_include_directories(fc PUBLIC include)
 
 set_source_files_properties(
@@ -237,13 +226,10 @@ target_link_libraries(
       Boost::multi_index
       Boost::dll
       Boost::multiprecision
-      Boost::beast
-      Boost::asio
       Boost::thread
       Boost::crc
       Threads::Threads
       OpenSSL::Crypto
-      ZLIB::ZLIB
       ${PLATFORM_SPECIFIC_LIBS}
       ${CMAKE_DL_LIBS}
       secp256k1
