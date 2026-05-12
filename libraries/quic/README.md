@@ -1,6 +1,6 @@
 # fcl_quic
 
-`fcl_quic` owns the QUIC transport layer over ngtcp2, OpenSSL 3 and Boost.Asio.
+`fcl_quic` owns the QUIC transport layer over ngtcp2, OpenSSL 3.0+ and Boost.Asio.
 It exposes endpoints, security options, listeners, connectors, connections and
 framed streams without defining application protocols.
 
@@ -126,7 +126,7 @@ typed failures instead of vague network errors.
 
 ## Security Notes
 
-OpenSSL 3 is the supported TLS backend. Fingerprint and mTLS failures are
+OpenSSL 3.0+ is the supported TLS backend. Fingerprint and mTLS failures are
 correctness failures, not warnings. CA-based client verification binds the peer
 certificate to the requested endpoint host; SNI alone is not treated as identity
 verification. Pinned fingerprints and custom verifiers are explicit trust paths;

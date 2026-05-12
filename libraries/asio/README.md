@@ -87,16 +87,20 @@ if (!completed) {
 ### Submit Priority Work
 
 ```cpp
+#include <boost/asio/awaitable.hpp>
+
 import fcl.asio.task_scheduler;
 
-auto scheduler = fcl::asio::task_scheduler{runtime, {.max_active_tasks = 4}};
-auto handle = scheduler.submit({
-   .priority = fcl::asio::priority{100},
-   .name = "metadata-refresh",
-   .work = [] { refresh_metadata(); },
-});
+boost::asio::awaitable<void> submit_metadata_refresh(fcl::asio::runtime& runtime) {
+   auto scheduler = fcl::asio::task_scheduler{runtime, {.max_active_tasks = 4}};
+   auto refresh = scheduler.submit({
+      .priority = fcl::asio::priority{100},
+      .name = "metadata-refresh",
+      .work = [] { refresh_metadata(); },
+   });
 
-co_await handle.wait();
+   co_await refresh.wait();
+}
 ```
 
 ### Isolate Blocking Work Behind The Scheduler
@@ -111,7 +115,7 @@ wait handle instead of `std::future`.
 import fcl.asio.task_scheduler;
 
 boost::asio::awaitable<void> refresh_index(fcl::asio::task_scheduler& scheduler) {
-   auto handle = scheduler.submit({
+   auto index_job = scheduler.submit({
       .priority = fcl::asio::priority{25},
       .name = "index-refresh",
       .work = [] {
@@ -119,7 +123,7 @@ boost::asio::awaitable<void> refresh_index(fcl::asio::task_scheduler& scheduler)
       },
    });
 
-   co_await handle.wait();
+   co_await index_job.wait();
 }
 ```
 
@@ -134,21 +138,23 @@ instead of assuming the queue can grow forever.
 ```cpp
 #include <stdexcept>
 
-auto scheduler = fcl::asio::task_scheduler{
-   runtime,
-   {.max_active_tasks = 1, .max_pending_tasks = 2},
-};
+boost::asio::awaitable<void> run_small_job(fcl::asio::runtime& runtime) {
+   auto scheduler = fcl::asio::task_scheduler{
+      runtime,
+      {.max_active_tasks = 1, .max_pending_tasks = 2},
+   };
 
-auto accepted = scheduler.submit({
-   .priority = fcl::asio::priority{0},
-   .name = "small-job",
-   .work = [] { do_small_job(); },
-});
+   auto accepted = scheduler.submit({
+      .priority = fcl::asio::priority{0},
+      .name = "small-job",
+      .work = [] { do_small_job(); },
+   });
 
-try {
-   co_await accepted.wait();
-} catch (const std::runtime_error& error) {
-   report_busy(error.what()); // for example: scheduler queue is full
+   try {
+      co_await accepted.wait();
+   } catch (const std::runtime_error& error) {
+      report_busy(error.what()); // for example: scheduler queue is full
+   }
 }
 ```
 
@@ -211,16 +217,18 @@ running work is allowed to finish through its normal function body, and handles
 can still be awaited by tests.
 
 ```cpp
-auto pending = scheduler.submit_after(
-   {.priority = fcl::asio::priority{0}, .name = "slow-retry", .work = [] { retry(); }},
-   std::chrono::minutes{1});
+boost::asio::awaitable<void> stop_with_pending_work(fcl::asio::task_scheduler& scheduler) {
+   auto pending = scheduler.submit_after(
+      {.priority = fcl::asio::priority{0}, .name = "slow-retry", .work = [] { retry(); }},
+      std::chrono::minutes{1});
 
-scheduler.stop();
-co_await pending.wait();
+   scheduler.stop();
+   co_await pending.wait();
 
-auto metrics = scheduler.metrics();
-assert(metrics.stopped);
-assert(metrics.canceled >= 1);
+   auto metrics = scheduler.metrics();
+   assert(metrics.stopped);
+   assert(metrics.canceled >= 1);
+}
 ```
 
 ## Backpressure And Shutdown

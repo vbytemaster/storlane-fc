@@ -103,6 +103,17 @@ static const fcl::sha256& test_origin_hash() {
    return value;
 }
 
+static std::string nested_unknown_client_data_json(std::size_t depth) {
+   std::string nested = "null";
+   for(std::size_t i = 0; i < depth; ++i) {
+      nested = "{\"next\":" + nested + "}";
+   }
+
+   return "{\"origin\":\"https://fctesting.invalid\",\"type\":\"webauthn.get\",\"challenge\":\"" +
+          fcl::base64url_encode(challenge_digest().data(), challenge_digest().data_size()) +
+          "\",\"ignored\":" + nested + "}";
+}
+
 BOOST_AUTO_TEST_SUITE(webauthn_suite)
 
 // Good signature
@@ -117,6 +128,31 @@ BOOST_AUTO_TEST_CASE(good) try {
    memcpy(auth_data.data(), test_origin_hash().data(), sizeof(test_origin_hash()));
 
    BOOST_CHECK_EQUAL(wa_pub, make_webauthn_sig(test_priv(), auth_data, json).recover(challenge_digest(), true));
+}
+FCL_LOG_AND_RETHROW();
+
+BOOST_AUTO_TEST_CASE(good_unknown_field_reasonable_depth) try {
+   webauthn::public_key wa_pub(test_pub().serialize(), webauthn::public_key::user_presence_t::USER_PRESENCE_NONE,
+                               "fctesting.invalid");
+   std::string json = nested_unknown_client_data_json(8);
+
+   std::vector<uint8_t> auth_data(37);
+   memcpy(auth_data.data(), test_origin_hash().data(), sizeof(test_origin_hash()));
+
+   BOOST_CHECK_EQUAL(wa_pub, make_webauthn_sig(test_priv(), auth_data, json).recover(challenge_digest(), true));
+}
+FCL_LOG_AND_RETHROW();
+
+BOOST_AUTO_TEST_CASE(rejects_excessive_unknown_field_nesting) try {
+   std::string json = nested_unknown_client_data_json(96);
+
+   std::vector<uint8_t> auth_data(37);
+   memcpy(auth_data.data(), test_origin_hash().data(), sizeof(test_origin_hash()));
+
+   BOOST_CHECK_EXCEPTION(make_webauthn_sig(test_priv(), auth_data, json).recover(challenge_digest(), true),
+                         fcl::error::context_error, [](const fcl::error::context_error& e) {
+                            return std::string(e.what()).find("JSON nesting depth") != std::string::npos;
+                         });
 }
 FCL_LOG_AND_RETHROW();
 

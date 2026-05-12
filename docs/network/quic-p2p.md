@@ -36,7 +36,7 @@ durability and authorization.
 ## QUIC Responsibilities
 
 - UDP socket/timer integration with Asio.
-- ngtcp2 packet engine and OpenSSL 3 TLS backend.
+- ngtcp2 packet engine and OpenSSL 3.0+ TLS backend.
 - ALPN, certificate verification, pinned fingerprints and mTLS checks.
 - Framed stream codec and transport limits.
 - Backpressure for streams, queued bytes and inbound packet queues.

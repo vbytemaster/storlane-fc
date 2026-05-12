@@ -11,7 +11,7 @@ wire bytes, primarily through `fcl::raw::pack/unpack` for retained types.
 Prefer leaf targets:
 
 ```cmake
-find_package(FCL CONFIG REQUIRED)
+find_package(FCL CONFIG REQUIRED COMPONENTS raw crypto app log)
 
 target_link_libraries(my_program PRIVATE
    FCL::fcl_raw
@@ -21,8 +21,10 @@ target_link_libraries(my_program PRIVATE
 )
 ```
 
-Use `FCL::fcl` only when the consumer intentionally wants every FCL feature and
-its transitive dependencies.
+Use `find_package(FCL CONFIG REQUIRED)` without components only for lightweight
+`FCL::fcl_core` consumers. Use `FCL::fcl` only when the consumer intentionally
+wants every FCL feature and its transitive dependencies; request `COMPONENTS all`
+before linking that aggregate.
 
 ## Includes And Modules
 
@@ -154,7 +156,7 @@ import fcl.crypto.aes;
 import fcl.crypto.random;
 ```
 
-OpenSSL 3 is the backend baseline. FCL does not shell out to `openssl`. AES-GCM
+OpenSSL 3.0+ is the backend baseline. FCL does not shell out to `openssl`. AES-GCM
 is the preferred modern symmetric API; CBC/CFB remain compatibility surfaces.
 
 ## App And Runtime

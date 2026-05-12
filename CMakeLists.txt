@@ -67,7 +67,7 @@ else()
    message(STATUS "FCL log stacktrace backend: unavailable")
 endif()
 
-find_package(OpenSSL 3.5 REQUIRED COMPONENTS SSL Crypto)
+find_package(OpenSSL 3 REQUIRED COMPONENTS SSL Crypto)
 find_package(Ngtcp2 REQUIRED)
 find_package(glaze 7.5 CONFIG REQUIRED)
 if(TARGET glaze::glaze)

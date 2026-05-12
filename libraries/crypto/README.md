@@ -2,7 +2,7 @@
 
 `fcl_crypto` contains retained cryptographic primitives and wrappers: hashes,
 base encodings, AES/HMAC, AES-256-GCM, KDF helpers, K1/R1/WebAuthn keys and
-signatures, BLS/BN/GMP helpers, random bytes and OpenSSL 3 integration.
+signatures, BLS/BN/GMP helpers, random bytes and OpenSSL 3.0+ integration.
 
 ## When To Use
 
@@ -435,7 +435,7 @@ tests together when touching this code.
 
 - `private_key::to_string()` is secret material. Do not print it in diagnostics.
 - Use explicit redaction in config/log/TUI layers before rendering crypto values.
-- OpenSSL 3 is the only SSL/TLS-related crypto backend expected by FCL product
+- OpenSSL 3.0+ is the only SSL/TLS-related crypto backend expected by FCL product
   builds.
 - `fcl_crypto` is synchronous and does not import runtime schedulers; async
   scheduling belongs in caller or adapter layers.

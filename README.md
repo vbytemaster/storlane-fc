@@ -100,21 +100,24 @@ if (!parsed.ok()) {
 | [schema](libraries/schema/README.md) | `fcl_schema` | Field rules, defaults, ranges, diagnostics. | `fcl_reflect`. |
 | [config](libraries/config/README.md) | `fcl_config` | Neutral config document, merge, decode, redaction. | `fcl_schema`. |
 | [program_options](libraries/program_options/README.md) | `fcl_program_options` | CLI adapter from Boost.Program_options into config documents. | Boost.Program_options privately. |
-| [crypto](libraries/crypto/README.md) | `fcl_crypto` | Hashes, encodings, keys, signatures, OpenSSL 3 crypto. | OpenSSL::Crypto, GMP, secp256k1, BLS. |
+| [crypto](libraries/crypto/README.md) | `fcl_crypto` | Hashes, encodings, keys, signatures, OpenSSL 3.0+ crypto. | OpenSSL::Crypto, GMP, secp256k1, BLS. |
 | [log](libraries/log/README.md) | `fcl_log` | Logging core, messages, console/appender boundary. | `fcl_variant`, Boost.DLL privately. |
 | [asio](libraries/asio/README.md) | `fcl_asio` | Asio runtime, blocking boundary, priority scheduler. | Boost.Asio, threads. |
 | [app](libraries/app/README.md) | `fcl_app` | Async application lifecycle, plugins, ports, diagnostics. | `fcl_asio`, `fcl_config`. |
 | [http](libraries/http/README.md) | `fcl_http` | HTTP target/base URL, router, middleware, client/server. | Boost.Beast/URL/Asio, OpenSSL. |
 | [websocket](libraries/websocket/README.md) | `fcl_websocket` | WebSocket connection/client primitives. | Boost.Beast/Asio, OpenSSL. |
-| [quic](libraries/quic/README.md) | `fcl_quic` | QUIC endpoint, listener, connector, framed streams. | ngtcp2, OpenSSL 3, Boost.Asio. |
+| [quic](libraries/quic/README.md) | `fcl_quic` | QUIC endpoint, listener, connector, framed streams. | ngtcp2, OpenSSL 3.0+, Boost.Asio. |
 | [p2p](libraries/p2p/README.md) | `fcl_p2p` | Peer identity, sessions, protocols, relay, path manager. | `fcl_quic`, `fcl_asio`. |
 | [tui](libraries/tui/README.md) | `fcl_tui` | Terminal UI value models, render helpers, runner. | Notcurses core privately and optionally. |
 
-`fcl` is an all-in aggregate target for consumers that intentionally want the
-whole library set. Production code that needs a small dependency footprint
-should link concrete leaf targets such as `fcl_config`, `fcl_json` or
-`fcl_quic`; external backends like OpenSSL, ngtcp2, Glaze and Boost components
-belong to the leaf target that actually owns their API or implementation use.
+`find_package(FCL CONFIG REQUIRED)` is intentionally lightweight and discovers
+only the `core` package surface. Production code that needs feature libraries
+must request components and then link concrete leaf targets such as
+`FCL::fcl_config`, `FCL::fcl_json` or `FCL::fcl_quic`. External backends like
+OpenSSL, ngtcp2, Glaze and Boost components belong to the leaf target that
+actually owns their API or implementation use. `FCL::fcl` remains the all-in
+aggregate target, but consumers should request `COMPONENTS all` before linking
+it.
 
 ## Архитектурные Документы
 
@@ -186,7 +189,7 @@ cmake --install build/fcl-debug --prefix build/fcl-install --component dev
 Consumer CMake:
 
 ```cmake
-find_package(FCL CONFIG REQUIRED)
+find_package(FCL CONFIG REQUIRED COMPONENTS raw crypto app log)
 
 target_link_libraries(my_program PRIVATE
    FCL::fcl_raw
@@ -196,6 +199,8 @@ target_link_libraries(my_program PRIVATE
 )
 ```
 
-The repository also contains an external smoke project under
-[`tests/package_consumer`](tests/package_consumer) that verifies installed
-targets and module imports through `find_package(FCL CONFIG REQUIRED)`.
+The repository also contains external smoke projects under
+[`tests/package_consumer`](tests/package_consumer) and
+[`tests/package_core_lightweight`](tests/package_core_lightweight). They verify
+both component-rich consumers and the lightweight `find_package(FCL)` path that
+does not discover heavy crypto/transport/codec backends.

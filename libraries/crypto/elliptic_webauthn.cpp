@@ -46,6 +46,8 @@ class client_data_json_reader {
    }
 
  private:
+   static constexpr std::size_t max_json_depth = 64;
+
    void parse_top_object(client_data_fields& fields) {
       expect('{');
       skip_ws();
@@ -67,7 +69,7 @@ class client_data_json_reader {
          } else if (key == "type") {
             fields.type = parse_required_string("type");
          } else {
-            skip_value();
+            skip_value(1);
          }
 
          skip_ws();
@@ -85,14 +87,15 @@ class client_data_json_reader {
       return parse_string();
    }
 
-   void skip_value() {
+   void skip_value(std::size_t depth) {
+      ensure_depth(depth);
       skip_ws();
       if (peek('"')) {
          (void)parse_string();
       } else if (consume('{')) {
-         skip_object_body();
+         skip_object_body(depth + 1);
       } else if (consume('[')) {
-         skip_array_body();
+         skip_array_body(depth + 1);
       } else if (peek('-') || peek_digit()) {
          skip_number();
       } else if (consume_literal("true") || consume_literal("false") || consume_literal("null")) {
@@ -102,7 +105,8 @@ class client_data_json_reader {
       }
    }
 
-   void skip_object_body() {
+   void skip_object_body(std::size_t depth) {
+      ensure_depth(depth);
       skip_ws();
       if (consume('}')) {
          return;
@@ -112,7 +116,7 @@ class client_data_json_reader {
          (void)parse_string();
          skip_ws();
          expect(':');
-         skip_value();
+         skip_value(depth);
          skip_ws();
          if (consume('}')) {
             return;
@@ -121,13 +125,14 @@ class client_data_json_reader {
       }
    }
 
-   void skip_array_body() {
+   void skip_array_body(std::size_t depth) {
+      ensure_depth(depth);
       skip_ws();
       if (consume(']')) {
          return;
       }
       while (true) {
-         skip_value();
+         skip_value(depth);
          skip_ws();
          if (consume(']')) {
             return;
@@ -321,6 +326,12 @@ class client_data_json_reader {
    void skip_ws() {
       while (_pos < _input.size() && std::isspace(static_cast<unsigned char>(_input[_pos])) != 0) {
          ++_pos;
+      }
+   }
+
+   void ensure_depth(std::size_t depth) const {
+      if (depth > max_json_depth) {
+         fail("JSON nesting depth exceeded");
       }
    }
 
