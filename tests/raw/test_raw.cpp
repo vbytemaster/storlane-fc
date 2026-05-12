@@ -1,5 +1,6 @@
 #include <boost/describe.hpp>
 #include <boost/test/unit_test.hpp>
+#include <fcl/raw/serialization.hpp>
 #include <chrono>
 #include <optional>
 #include <set>
@@ -7,8 +8,10 @@
 
 import fcl.exception.exception;
 import fcl.crypto.hex;
+import fcl.crypto.sha256;
 import fcl.raw.datastream;
 import fcl.raw.raw;
+import fcl.variant;
 import fcl.variant.dynamic_bitset;
 
 using namespace fcl;
@@ -41,6 +44,17 @@ struct described_child : described_base {
    bool operator==(const described_child&) const = default;
 };
 BOOST_DESCRIBE_STRUCT(described_child, (described_base), (child))
+
+struct macro_serialized_record {
+   uint16_t id = 0;
+   std::string name;
+
+   bool operator==(const macro_serialized_record&) const = default;
+};
+BOOST_DESCRIBE_STRUCT(macro_serialized_record, (), (id, name))
+
+FCL_DECLARE_SERIALIZATION(macro_serialized_record)
+FCL_IMPLEMENT_SERIALIZATION(macro_serialized_record)
 
 BOOST_AUTO_TEST_SUITE(raw_test_suite)
 
@@ -83,6 +97,37 @@ BOOST_AUTO_TEST_CASE(boost_describe_derived_types_pack_base_first_then_local_mem
 
    const auto unpacked = fcl::raw::unpack<described_child>(packed);
    BOOST_CHECK(value == unpacked);
+}
+
+BOOST_AUTO_TEST_CASE(serialization_macros_instantiate_raw_variant_and_digest_pack_paths)
+{
+   const macro_serialized_record value{0x1234, "node"};
+
+   fcl::variant variant_value;
+   fcl::to_variant(value, variant_value);
+   auto from_variant = macro_serialized_record{};
+   fcl::from_variant(variant_value, from_variant);
+   BOOST_CHECK(value == from_variant);
+
+   fcl::datastream<size_t> size_stream;
+   fcl::raw::pack(size_stream, value);
+   BOOST_CHECK_EQUAL(size_stream.tellp(), 7u);
+
+   char buffer[32]{};
+   fcl::datastream<char*> write_stream(buffer, sizeof(buffer));
+   fcl::raw::pack(write_stream, value);
+   BOOST_CHECK_EQUAL(fcl::to_hex(std::vector<char>(buffer, buffer + write_stream.tellp())), "3412046e6f6465");
+
+   fcl::datastream<const char*> read_stream(buffer, write_stream.tellp());
+   auto unpacked = macro_serialized_record{};
+   fcl::raw::unpack(read_stream, unpacked);
+   BOOST_CHECK(value == unpacked);
+
+   fcl::sha256::encoder digest_stream;
+   fcl::raw::pack(digest_stream, value);
+   BOOST_CHECK_EQUAL(
+      digest_stream.result().str(),
+      fcl::sha256::hash(buffer, static_cast<uint32_t>(write_stream.tellp())).str());
 }
 
 BOOST_AUTO_TEST_CASE(std_chrono_preserves_old_fc_raw_layout)

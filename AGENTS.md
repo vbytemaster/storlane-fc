@@ -50,6 +50,9 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Binary serialization compatibility with the old FC raw byte layout is a hard gate.
 - Any replacement for raw serialization must prove byte-for-byte compatibility with golden tests.
 - Reflection field order must be explicit and stable.
+- Macro-only serialization declaration helpers such as `FCL_DECLARE_SERIALIZATION`
+  may exist for explicit template instantiation, but they must not become a
+  reflection system or define field order. Field order remains Boost.Describe.
 
 ## JSON, YAML, And Schema
 

@@ -31,6 +31,68 @@ Dependencies: `fcl_asio`, `fcl_config`, Boost headers.
 
 ## Examples
 
+### Wrap Runtime In `application_base`
+
+Program binaries usually expose their own application class. It owns the FCL
+runtime objects, delegates plugin lifecycle to `application_runtime`, and keeps
+`request_stop()` synchronous so signal handlers can call it safely.
+
+```cpp
+#include <boost/asio/awaitable.hpp>
+
+#include <memory>
+#include <vector>
+
+import fcl.app;
+import fcl.asio.runtime;
+import fcl.asio.task_scheduler;
+
+class service_app final : public fcl::app::application_base {
+public:
+   explicit service_app(std::vector<std::unique_ptr<fcl::app::plugin>> plugins)
+      : scheduler_{runtime_}
+      , context_{scheduler_, ports_, signals_, events_, &diagnostics_}
+      , app_{context_, std::move(plugins), &diagnostics_} {}
+
+   boost::asio::awaitable<void> initialize() override {
+      co_await app_.initialize();
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      co_await app_.startup();
+      co_return;
+   }
+
+   void request_stop() noexcept override {
+      app_.request_stop();
+      scheduler_.stop();
+      runtime_.stop();
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      co_await app_.shutdown();
+      co_return;
+   }
+
+   fcl::asio::runtime& runtime() noexcept { return runtime_; }
+
+private:
+   fcl::asio::runtime runtime_{{.worker_threads = 2, .thread_name = "service"}};
+   fcl::asio::task_scheduler scheduler_;
+   fcl::app::port_registry ports_;
+   fcl::app::signal_bus signals_;
+   fcl::app::event_bus events_;
+   fcl::app::diagnostics_store diagnostics_;
+   fcl::app::plugin_context context_;
+   fcl::app::application_runtime app_;
+};
+```
+
+The class above is intentionally thin. Product code may add CLI/YAML loading,
+PID files or platform service integration around it, but the plugin lifecycle
+stays in `application_runtime`.
+
 ### Publish Config For A Plugin
 
 ```cpp
@@ -86,6 +148,52 @@ public:
 private:
    std::uint16_t port_ = 8080;
 };
+```
+
+### Subscribe To Lifecycle Signals
+
+`signal_bus` is a typed lifecycle notification channel. Use it for metrics,
+diagnostics and operator-visible state. Do not use it as hidden business flow;
+plugins should still communicate through ports or explicit APIs.
+
+```cpp
+import fcl.app.signals;
+
+auto signals = fcl::app::signal_bus{};
+auto started = signals.plugin_started.connect([](const fcl::app::plugin_signal& event) {
+   record_metric("plugin.started", event.plugin);
+});
+auto stopped = signals.plugin_stopped.connect([](const fcl::app::plugin_signal& event) {
+   record_metric("plugin.stopped", event.plugin);
+});
+
+// Keep returned boost::signals2::connection objects if you need to disconnect.
+started.disconnect();
+stopped.disconnect();
+```
+
+### Run A Foreground Program
+
+`fcl_app` does not install OS signal handlers by itself. A binary decides how to
+bridge `SIGINT`/`SIGTERM`, platform service stop requests or test hooks into
+`request_stop()`.
+
+```cpp
+import fcl.app;
+import fcl.asio.blocking;
+
+auto app = service_app{make_plugins()};
+
+try {
+   fcl::asio::blocking::run(app.runtime(), app.initialize());
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+   wait_for_process_signal([&] { app.request_stop(); });
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+} catch (...) {
+   app.request_stop();
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+   throw;
+}
 ```
 
 ### Install And Consume Ports

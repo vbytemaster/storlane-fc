@@ -25,6 +25,8 @@ modern FCL modules and Boost.Describe for structure traversal.
 - `fcl.raw.varint` — signed/unsigned variable-width integer wrappers.
 - `fcl.raw.enum_type` — enum support.
 - `fcl.raw.raw` — `pack`, `unpack`, `pack_size`.
+- `fcl/raw/serialization.hpp` — macro-only explicit-instantiation helpers for
+  product/domain DTOs.
 
 Target: `fcl_raw`.
 
@@ -77,6 +79,53 @@ import fcl.raw.raw;
 auto time = std::chrono::sys_seconds{std::chrono::seconds{1}};
 fcl::raw::pack(stream, time); // old FC time_point_sec: uint32 seconds
 ```
+
+### Declare Explicit Serialization Instantiations
+
+Use the macro-only header when a product wants one `.cpp` file to own template
+instantiations for a frequently used DTO, while other translation units only see
+`extern template` declarations.
+
+```cpp
+#include <boost/describe.hpp>
+#include <fcl/raw/serialization.hpp>
+
+#include <cstdint>
+#include <string>
+
+struct action_payload {
+   std::uint64_t id = 0;
+   std::string actor;
+};
+
+BOOST_DESCRIBE_STRUCT(action_payload, (), (id, actor))
+
+import fcl.crypto.sha256;
+import fcl.raw.datastream;
+import fcl.raw.raw;
+import fcl.variant;
+
+FCL_DECLARE_SERIALIZATION(action_payload)
+```
+
+Then place the implementation macro in exactly one module implementation unit
+or `.cpp` file:
+
+```cpp
+#include <fcl/raw/serialization.hpp>
+
+import fcl.crypto.sha256;
+import fcl.raw.datastream;
+import fcl.raw.raw;
+import fcl.variant;
+
+FCL_IMPLEMENT_SERIALIZATION(action_payload)
+```
+
+`FCL_DECLARE_SERIALIZATION_PACK` and `FCL_IMPLEMENT_SERIALIZATION_PACK` cover
+`datastream<size_t>`, `datastream<char*>`, `datastream<const char*>` and
+`sha256::encoder`. `FCL_DECLARE_SERIALIZATION_VARIANT` and
+`FCL_IMPLEMENT_SERIALIZATION_VARIANT` cover `to_variant/from_variant`.
 
 ## Compatibility Rules
 
