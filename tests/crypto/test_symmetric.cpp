@@ -1,4 +1,5 @@
 #include <boost/test/unit_test.hpp>
+#include <boost/describe.hpp>
 #include <fcl/exception/macros.hpp>
 
 #include <algorithm>
@@ -11,6 +12,14 @@ import fcl.crypto.kdf;
 import fcl.crypto.random;
 import fcl.crypto.types;
 import fcl.exception.exception;
+import fcl.raw.raw;
+
+struct encrypted_record {
+   std::uint32_t id = 0;
+   std::string name;
+};
+
+BOOST_DESCRIBE_STRUCT(encrypted_record, (), (id, name))
 
 BOOST_AUTO_TEST_SUITE(crypto_symmetric)
 
@@ -105,6 +114,121 @@ BOOST_AUTO_TEST_CASE(aes256_gcm_rejects_bad_tag) try {
       [](const fcl::crypto::error& error) {
          return error.kind() == fcl::crypto::error_kind::authentication_failed;
       });
+} FCL_LOG_AND_RETHROW();
+
+BOOST_AUTO_TEST_CASE(aes256_gcm_streaming_encoder_matches_one_shot_chunks) try {
+   const auto key = fcl::crypto::generate_aes256_key();
+   const auto nonce = fcl::crypto::bytes{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+   const auto aad = fcl::crypto::bytes{'m', 'e', 't', 'a'};
+   const auto plaintext = fcl::crypto::bytes{'s', 't', 'r', 'e', 'a', 'm', 'i', 'n', 'g'};
+
+   auto streaming_ciphertext = fcl::crypto::bytes{};
+   auto encoder = fcl::crypto::aes256_gcm_encoder{
+      fcl::crypto::aes256_gcm_encoder_options{
+         .key = key,
+         .nonce = nonce,
+         .aad = aad,
+         .ciphertext_sink = [&](std::span<const std::uint8_t> chunk) {
+            streaming_ciphertext.insert(streaming_ciphertext.end(), chunk.begin(), chunk.end());
+         },
+      }};
+
+   encoder.write(std::span<const std::uint8_t>{plaintext.data(), 3});
+   encoder.write(std::span<const std::uint8_t>{plaintext.data() + 3, plaintext.size() - 3});
+   const auto streaming_auth = encoder.finalize();
+
+   const auto one_shot = fcl::crypto::encrypt_aes256_gcm({
+      .key = key,
+      .nonce = nonce,
+      .plaintext = plaintext,
+      .aad = aad,
+   });
+
+   BOOST_CHECK_EQUAL_COLLECTIONS(
+      streaming_ciphertext.begin(),
+      streaming_ciphertext.end(),
+      one_shot.ciphertext.begin(),
+      one_shot.ciphertext.end());
+   BOOST_CHECK_EQUAL_COLLECTIONS(
+      streaming_auth.tag.begin(),
+      streaming_auth.tag.end(),
+      one_shot.tag.begin(),
+      one_shot.tag.end());
+} FCL_LOG_AND_RETHROW();
+
+BOOST_AUTO_TEST_CASE(aes256_gcm_streaming_encoder_accepts_raw_pack) try {
+   const auto key = fcl::crypto::generate_aes256_key();
+   const auto nonce = fcl::crypto::bytes{11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
+   const auto aad = fcl::crypto::bytes{'r', 'a', 'w'};
+   const auto value = encrypted_record{.id = 42, .name = "packed"};
+
+   auto streaming_ciphertext = fcl::crypto::bytes{};
+   auto encoder = fcl::crypto::aes256_gcm_encoder{
+      fcl::crypto::aes256_gcm_encoder_options{
+         .key = key,
+         .nonce = nonce,
+         .aad = aad,
+         .ciphertext_sink = [&](std::span<const std::uint8_t> chunk) {
+            streaming_ciphertext.insert(streaming_ciphertext.end(), chunk.begin(), chunk.end());
+         },
+      }};
+
+   fcl::raw::pack(encoder, value);
+   const auto streaming_auth = encoder.finalize();
+
+   const auto packed = fcl::raw::pack(value);
+   const auto one_shot = fcl::crypto::encrypt_aes256_gcm({
+      .key = key,
+      .nonce = nonce,
+      .plaintext = fcl::crypto::bytes{packed.begin(), packed.end()},
+      .aad = aad,
+   });
+
+   BOOST_CHECK_EQUAL_COLLECTIONS(
+      streaming_ciphertext.begin(),
+      streaming_ciphertext.end(),
+      one_shot.ciphertext.begin(),
+      one_shot.ciphertext.end());
+   BOOST_CHECK_EQUAL_COLLECTIONS(
+      streaming_auth.tag.begin(),
+      streaming_auth.tag.end(),
+      one_shot.tag.begin(),
+      one_shot.tag.end());
+} FCL_LOG_AND_RETHROW();
+
+BOOST_AUTO_TEST_CASE(aes256_gcm_streaming_decoder_emits_provisional_plaintext_until_finalize) try {
+   const auto key = fcl::crypto::generate_aes256_key();
+   const auto aad = fcl::crypto::bytes{'m', 'e', 't', 'a'};
+   const auto expected = fcl::crypto::bytes{'p', 'r', 'o', 'v', 'i', 's', 'i', 'o', 'n', 'a', 'l'};
+   auto encrypted = fcl::crypto::encrypt_aes256_gcm({
+      .key = key,
+      .nonce = {1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144},
+      .plaintext = expected,
+      .aad = aad,
+   });
+
+   auto provisional = fcl::crypto::bytes{};
+   auto decoder = fcl::crypto::aes256_gcm_decoder{
+      fcl::crypto::aes256_gcm_decoder_options{
+         .key = key,
+         .nonce = encrypted.nonce,
+         .tag = encrypted.tag,
+         .aad = aad,
+         .plaintext_sink = [&](std::span<const std::uint8_t> chunk) {
+            provisional.insert(provisional.end(), chunk.begin(), chunk.end());
+         },
+      }};
+
+   decoder.write(std::span<const std::uint8_t>{encrypted.ciphertext.data(), 4});
+   BOOST_CHECK(!provisional.empty());
+   decoder.write(std::span<const std::uint8_t>{encrypted.ciphertext.data() + 4, encrypted.ciphertext.size() - 4});
+   decoder.finalize();
+
+   BOOST_CHECK_EQUAL_COLLECTIONS(
+      provisional.begin(),
+      provisional.end(),
+      expected.begin(),
+      expected.end());
 } FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(aes256_cbc_roundtrips_compatibility_payload) try {

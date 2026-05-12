@@ -98,6 +98,7 @@ auto decoded_base64 = fcl::base64_decode(base64);
 
 import fcl.crypto.random;
 import fcl.crypto.rand;
+import fcl.crypto.aes;
 
 auto seed = std::array<char, 32>{};      // retained low-level FC-compatible API
 fcl::rand_bytes(seed.data(), static_cast<int>(seed.size()));
@@ -188,7 +189,7 @@ auto material = fcl::crypto::derive_hkdf_sha256({
    .secret = {'w', 'o', 'r', 'k', 's', 'p', 'a', 'c', 'e'},
    .salt = {'s', 'a', 'l', 't'},
    .info = {'c', 'h', 'u', 'n', 'k', '-', 'k', 'e', 'y'},
-   .output_size = fcl::crypto::aes256_key_size,
+   .output_size = fcl::crypto::default_derived_key_size,
 });
 ```
 
@@ -209,7 +210,7 @@ auto vault_key = fcl::crypto::derive_scrypt({
    .r = 8,
    .p = 1,
    .max_memory_bytes = 32ULL * 1024ULL * 1024ULL,
-   .output_size = fcl::crypto::aes256_key_size,
+   .output_size = fcl::crypto::default_derived_key_size,
 });
 ```
 
@@ -242,6 +243,71 @@ auto plaintext = fcl::crypto::decrypt_aes256_gcm({
 AES-GCM requires nonce uniqueness per key. FCL validates sizes and tag
 authentication, but callers own key lifecycle, nonce policy and secret
 redaction.
+
+### Stream Raw-Compatible Data Into AES-256-GCM
+
+```cpp
+#include <boost/describe.hpp>
+
+#include <cstdint>
+#include <string>
+
+struct sealed_payload {
+   std::uint64_t nonce = 0;
+   std::string body;
+};
+
+BOOST_DESCRIBE_STRUCT(sealed_payload, (), (nonce, body))
+
+import fcl.crypto.aes;
+import fcl.crypto.random;
+import fcl.raw.raw;
+
+auto ciphertext = fcl::crypto::bytes{};
+auto key = fcl::crypto::generate_aes256_key();
+auto nonce = fcl::crypto::random_bytes(fcl::crypto::aes_gcm_nonce_size);
+
+auto encoder = fcl::crypto::aes256_gcm_encoder{
+   fcl::crypto::aes256_gcm_encoder_options{
+      .key = key,
+      .nonce = nonce,
+      .aad = {'m', 'e', 't', 'a'},
+      .ciphertext_sink = [&](std::span<const std::uint8_t> chunk) {
+         ciphertext.insert(ciphertext.end(), chunk.begin(), chunk.end());
+      },
+   }};
+
+fcl::raw::pack(encoder, sealed_payload{.nonce = 7, .body = "large payload"});
+auto authentication = encoder.finalize();
+```
+
+`aes256_gcm_encoder` exposes `write(const char*, std::size_t)` so it can be used
+as a raw pack stream, like hash encoders. The sink receives ciphertext chunks as
+OpenSSL produces them; callers do not need to materialize all plaintext first.
+
+### Stream AES-256-GCM Decryption
+
+```cpp
+import fcl.crypto.aes;
+
+auto plaintext = fcl::crypto::bytes{};
+auto decoder = fcl::crypto::aes256_gcm_decoder{
+   fcl::crypto::aes256_gcm_decoder_options{
+      .key = key,
+      .nonce = authentication.nonce,
+      .tag = authentication.tag,
+      .aad = {'m', 'e', 't', 'a'},
+      .plaintext_sink = [&](std::span<const std::uint8_t> chunk) {
+         plaintext.insert(plaintext.end(), chunk.begin(), chunk.end());
+      },
+   }};
+
+decoder.write(ciphertext.data(), ciphertext.size());
+decoder.finalize();
+```
+
+Plaintext emitted before `finalize()` is provisional. For files, write to a
+temporary path and only commit or rename after tag verification succeeds.
 
 ### AES-256-CBC Compatibility Helper
 
