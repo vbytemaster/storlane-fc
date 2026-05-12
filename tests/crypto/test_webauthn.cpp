@@ -424,6 +424,19 @@ BOOST_AUTO_TEST_CASE(good_extrajunk) try {
    BOOST_CHECK_EQUAL(wa_pub, make_webauthn_sig(test_priv(), auth_data, json).recover(challenge_digest(), true));
 } FCL_LOG_AND_RETHROW();
 
+// Good signature with escaped slashes and nested ignored fields. This keeps the
+// private WebAuthn parser honest without adding a JSON backend dependency.
+BOOST_AUTO_TEST_CASE(good_escaped_origin_and_nested_unknown_fields) try {
+   webauthn::public_key wa_pub(test_pub().serialize(), webauthn::public_key::user_presence_t::USER_PRESENCE_NONE, "fctesting.invalid");
+   std::string json = "{\"ignored\":[{\"nested\":true}],\"origin\":\"https:\\/\\/fctesting.invalid\","
+                      "\"type\":\"webauthn.get\",\"challenge\":\"" + fcl::base64url_encode(challenge_digest().data(), challenge_digest().data_size()) + "\"}";
+
+   std::vector<uint8_t> auth_data(37);
+   memcpy(auth_data.data(), test_origin_hash().data(), sizeof(test_origin_hash()));
+
+   BOOST_CHECK_EQUAL(wa_pub, make_webauthn_sig(test_priv(), auth_data, json).recover(challenge_digest(), true));
+} FCL_LOG_AND_RETHROW();
+
 //Good signature but it's not a JSON object!
 BOOST_AUTO_TEST_CASE(not_json_object) try {
    webauthn::public_key wa_pub(test_pub().serialize(), webauthn::public_key::user_presence_t::USER_PRESENCE_NONE, "fctesting.invalid");

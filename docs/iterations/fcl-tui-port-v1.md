@@ -29,6 +29,6 @@ screens, authority flows, or application vocabulary move into FCL.
 
 - Build `fcl` and `test_fcl_tui`.
 - Run `test_fcl_tui`.
-- Check that no `storlane::` or `storlane.` names remain in `libraries/tui`
+- Check that no donor product namespace names remain in `libraries/tui`
   or `tests/tui`.
 - Check that Notcurses headers do not appear in public TUI modules or tests.

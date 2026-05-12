@@ -84,6 +84,10 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Do not shell out to an external `openssl` binary for key or certificate generation.
 - Specialized crypto libraries may remain optional targets when they have clear tests and isolated dependencies.
 - K1 compatibility must not be replaced with generic OpenSSL ECDSA behavior.
+- `fcl_crypto` stays synchronous and low-level. Do not import `fcl_asio`,
+  schedulers, threads or runtime policy into crypto primitives.
+- WebAuthn parsing must stay private to `fcl_crypto` and must not reintroduce a
+  public or vendored JSON parser dependency.
 
 ## Runtime And Networking
 

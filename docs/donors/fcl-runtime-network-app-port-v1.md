@@ -67,6 +67,6 @@ Proof is provided by ported unit tests and static gates:
 - `test_fcl_app`;
 - `test_fcl_http_websocket`;
 - `test_fcl_quic_p2p`;
-- `rg "storlane::|storlane\\." libraries tests`;
+- donor namespace grep over `libraries tests`;
 - no legacy net-prefix static grep;
 - `find libraries -maxdepth 2 -type d -name network -print`.

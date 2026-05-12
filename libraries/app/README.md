@@ -196,6 +196,56 @@ try {
 }
 ```
 
+### Bridge OS Signals Into `request_stop()`
+
+The app layer keeps signal policy outside the framework, but it composes cleanly
+with `boost::asio::signal_set` when a program wants POSIX-style foreground
+shutdown.
+
+```cpp
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/detached.hpp>
+#include <boost/asio/signal_set.hpp>
+#include <boost/asio/use_awaitable.hpp>
+
+#include <csignal>
+
+import fcl.asio.runtime;
+
+auto app = service_app{make_plugins()};
+auto signals = boost::asio::signal_set{app.runtime().context(), SIGINT, SIGTERM};
+
+boost::asio::co_spawn(
+   app.runtime().context(),
+   [&]() -> boost::asio::awaitable<void> {
+      co_await signals.async_wait(boost::asio::use_awaitable);
+      app.request_stop();
+   },
+   boost::asio::detached);
+```
+
+`request_stop()` must stay `noexcept` because signal bridges and platform service
+callbacks need a safe synchronous edge. Cleanup still belongs to async
+`shutdown()`.
+
+### Emit Lifecycle Diagnostics From Signals
+
+`signal_bus` is useful for readable lifecycle logs without coupling plugins to a
+specific logger.
+
+```cpp
+auto connection = signals.plugin_stopped.connect(
+   [&](const fcl::app::plugin_signal& event) {
+      events.publish(
+         fcl::app::event_severity::info,
+         "plugin.lifecycle",
+         event.plugin + " stopped");
+   });
+```
+
+Keep the returned connection if the subscriber has a shorter lifetime than the
+application.
+
 ### Install And Consume Ports
 
 Ports are typed interfaces. They are how plugins share runtime services without

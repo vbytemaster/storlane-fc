@@ -6,7 +6,6 @@ fcl_target_modules(fcl_crypto crypto)
 target_include_directories(
    fcl_crypto PUBLIC
       ${FCL_PUBLIC_INCLUDE_DIRS}
-      "${PROJECT_SOURCE_DIR}/vendor/rapidjson/include"
 )
 
 target_compile_definitions(

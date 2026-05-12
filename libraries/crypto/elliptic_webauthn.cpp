@@ -1,13 +1,15 @@
 module;
 #include <fcl/exception/macros.hpp>
+
+#include <cctype>
 #include <cstring>
 #include <exception>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
-
-#define RAPIDJSON_NAMESPACE_BEGIN namespace fcl::crypto::webauthn::detail::rapidjson {
-#define RAPIDJSON_NAMESPACE_END }
-#include "rapidjson/reader.h"
 
 module fcl.crypto.elliptic_webauthn;
 
@@ -22,220 +24,346 @@ namespace fcl::crypto::webauthn {
 namespace detail {
 using namespace std::literals;
 
-struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UTF8<>, webauthn_json_handler> {
-   std::string found_challenge;
-   std::string found_origin;
-   std::string found_type;
+struct client_data_fields {
+   std::string challenge;
+   std::string origin;
+   std::string type;
+};
 
-   enum parse_stat_t {
-      EXPECT_FIRST_OBJECT_START,
-      EXPECT_FIRST_OBJECT_KEY,
-      EXPECT_FIRST_OBJECT_DONTCARE_VALUE,
-      EXPECT_CHALLENGE_VALUE,
-      EXPECT_ORIGIN_VALUE,
-      EXPECT_TYPE_VALUE,
-      IN_NESTED_CONTAINER
-   } current_state = EXPECT_FIRST_OBJECT_START;
-   unsigned current_nested_container_depth = 0;
+class client_data_json_reader {
+public:
+   explicit client_data_json_reader(std::string_view input)
+      : _input(input)
+   {
+   }
 
-   bool basic_stuff() {
-      if(current_state == IN_NESTED_CONTAINER)
-         return true;
-      if(current_state == EXPECT_FIRST_OBJECT_DONTCARE_VALUE) {
-         current_state = EXPECT_FIRST_OBJECT_KEY;
+   client_data_fields parse()
+   {
+      auto fields = client_data_fields{};
+      skip_ws();
+      parse_top_object(fields);
+      skip_ws();
+      if (_pos != _input.size()) {
+         fail("trailing characters after top-level object");
+      }
+      return fields;
+   }
+
+private:
+   void parse_top_object(client_data_fields& fields)
+   {
+      expect('{');
+      skip_ws();
+      if (consume('}')) {
+         return;
+      }
+
+      while (true) {
+         skip_ws();
+         const auto key = parse_string();
+         skip_ws();
+         expect(':');
+         skip_ws();
+
+         if (key == "challenge") {
+            fields.challenge = parse_required_string("challenge");
+         } else if (key == "origin") {
+            fields.origin = parse_required_string("origin");
+         } else if (key == "type") {
+            fields.type = parse_required_string("type");
+         } else {
+            skip_value();
+         }
+
+         skip_ws();
+         if (consume('}')) {
+            return;
+         }
+         expect(',');
+      }
+   }
+
+   std::string parse_required_string(std::string_view field)
+   {
+      if (!peek('"')) {
+         fail("expected string value for field " + std::string(field));
+      }
+      return parse_string();
+   }
+
+   void skip_value()
+   {
+      skip_ws();
+      if (peek('"')) {
+         (void)parse_string();
+      } else if (consume('{')) {
+         skip_object_body();
+      } else if (consume('[')) {
+         skip_array_body();
+      } else if (peek('-') || peek_digit()) {
+         skip_number();
+      } else if (consume_literal("true") || consume_literal("false") || consume_literal("null")) {
+         return;
+      } else {
+         fail("expected JSON value");
+      }
+   }
+
+   void skip_object_body()
+   {
+      skip_ws();
+      if (consume('}')) {
+         return;
+      }
+      while (true) {
+         skip_ws();
+         (void)parse_string();
+         skip_ws();
+         expect(':');
+         skip_value();
+         skip_ws();
+         if (consume('}')) {
+            return;
+         }
+         expect(',');
+      }
+   }
+
+   void skip_array_body()
+   {
+      skip_ws();
+      if (consume(']')) {
+         return;
+      }
+      while (true) {
+         skip_value();
+         skip_ws();
+         if (consume(']')) {
+            return;
+         }
+         expect(',');
+      }
+   }
+
+   void skip_number()
+   {
+      if (consume('-') && !peek_digit()) {
+         fail("invalid JSON number");
+      }
+      if (consume('0')) {
+         if (peek_digit()) {
+            fail("invalid JSON number");
+         }
+      } else {
+         require_digit();
+         while (peek_digit()) {
+            ++_pos;
+         }
+      }
+      if (consume('.')) {
+         require_digit();
+         while (peek_digit()) {
+            ++_pos;
+         }
+      }
+      if (consume('e') || consume('E')) {
+         (void)(consume('+') || consume('-'));
+         require_digit();
+         while (peek_digit()) {
+            ++_pos;
+         }
+      }
+   }
+
+   std::string parse_string()
+   {
+      expect('"');
+      auto out = std::string{};
+      while (_pos < _input.size()) {
+         const auto ch = _input[_pos++];
+         if (ch == '"') {
+            return out;
+         }
+         if (static_cast<unsigned char>(ch) < 0x20) {
+            fail("unescaped control character in JSON string");
+         }
+         if (ch != '\\') {
+            out.push_back(ch);
+            continue;
+         }
+         if (_pos >= _input.size()) {
+            fail("unterminated escape sequence");
+         }
+         const auto escaped = _input[_pos++];
+         switch (escaped) {
+            case '"': out.push_back('"'); break;
+            case '\\': out.push_back('\\'); break;
+            case '/': out.push_back('/'); break;
+            case 'b': out.push_back('\b'); break;
+            case 'f': out.push_back('\f'); break;
+            case 'n': out.push_back('\n'); break;
+            case 'r': out.push_back('\r'); break;
+            case 't': out.push_back('\t'); break;
+            case 'u': append_unicode_escape(out); break;
+            default:
+               fail("invalid JSON escape");
+         }
+      }
+      fail("unterminated JSON string");
+   }
+
+   void append_unicode_escape(std::string& out)
+   {
+      auto codepoint = parse_hex_quad();
+      if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+         if (!consume('\\') || !consume('u')) {
+            fail("missing low surrogate in JSON string");
+         }
+         const auto low = parse_hex_quad();
+         if (low < 0xDC00 || low > 0xDFFF) {
+            fail("invalid low surrogate in JSON string");
+         }
+         codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+      } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+         fail("unexpected low surrogate in JSON string");
+      }
+      append_utf8(out, codepoint);
+   }
+
+   std::uint32_t parse_hex_quad()
+   {
+      auto value = std::uint32_t{0};
+      for (auto i = 0; i < 4; ++i) {
+         if (_pos >= _input.size()) {
+            fail("truncated unicode escape");
+         }
+         value = (value << 4) | hex_value(_input[_pos++]);
+      }
+      return value;
+   }
+
+   static void append_utf8(std::string& out, std::uint32_t codepoint)
+   {
+      if (codepoint <= 0x7F) {
+         out.push_back(static_cast<char>(codepoint));
+      } else if (codepoint <= 0x7FF) {
+         out.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+         out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+      } else if (codepoint <= 0xFFFF) {
+         out.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+         out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+         out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+      } else {
+         out.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+         out.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+         out.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+         out.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+      }
+   }
+
+   static std::uint32_t hex_value(char ch)
+   {
+      if (ch >= '0' && ch <= '9') {
+         return static_cast<std::uint32_t>(ch - '0');
+      }
+      if (ch >= 'a' && ch <= 'f') {
+         return static_cast<std::uint32_t>(ch - 'a' + 10);
+      }
+      if (ch >= 'A' && ch <= 'F') {
+         return static_cast<std::uint32_t>(ch - 'A' + 10);
+      }
+      throw std::invalid_argument{"invalid hex digit"};
+   }
+
+   bool consume(char expected)
+   {
+      if (peek(expected)) {
+         ++_pos;
          return true;
       }
       return false;
    }
 
-   bool Null() {
-      return basic_stuff();
-   }
-   bool Bool(bool) {
-      return basic_stuff();
-   }
-   bool Int(int) {
-      return basic_stuff();
-   }
-   bool Uint(unsigned) {
-      return basic_stuff();
-   }
-   bool Int64(int64_t) {
-      return basic_stuff();
-   }
-   bool Uint64(uint64_t) {
-      return basic_stuff();
-   }
-   bool Double(double) {
-      return basic_stuff();
+   bool consume_literal(std::string_view literal)
+   {
+      if (_input.substr(_pos, literal.size()) == literal) {
+         _pos += literal.size();
+         return true;
+      }
+      return false;
    }
 
-   bool String(const char* str, rapidjson::SizeType length, bool copy) {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_START:
-         case EXPECT_FIRST_OBJECT_KEY:
-            return false;
-         case EXPECT_CHALLENGE_VALUE:
-            found_challenge = std::string(str, length);
-            current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case EXPECT_ORIGIN_VALUE:
-            found_origin = std::string(str, length);
-            current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case EXPECT_TYPE_VALUE:
-            found_type = std::string(str, length);
-            current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-            current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case IN_NESTED_CONTAINER:
-            return true;
-         // default may not be added now, as consensus could be broken.
+   void expect(char expected)
+   {
+      if (!consume(expected)) {
+         auto message = std::string{"expected '"};
+         message.push_back(expected);
+         message.push_back('\'');
+         fail(message);
       }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "String: current_state(${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
    }
 
-   bool StartObject() {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_START:
-            current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-            current_state = IN_NESTED_CONTAINER;
-            ++current_nested_container_depth;
-            return true;
-         case IN_NESTED_CONTAINER:
-            ++current_nested_container_depth;
-            return true;
-         case EXPECT_FIRST_OBJECT_KEY:
-         case EXPECT_CHALLENGE_VALUE:
-         case EXPECT_ORIGIN_VALUE:
-         case EXPECT_TYPE_VALUE:
-            return false;
-         // default may not be added now, as consensus could be broken.
-      }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "StartObject: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
-   }
-   bool Key(const char* str, rapidjson::SizeType length, bool copy) {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_START:
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-         case EXPECT_CHALLENGE_VALUE:
-         case EXPECT_ORIGIN_VALUE:
-         case EXPECT_TYPE_VALUE:
-            return false;
-         case EXPECT_FIRST_OBJECT_KEY: {
-            if("challenge"s == str)
-               current_state = EXPECT_CHALLENGE_VALUE;
-            else if("origin"s == str)
-               current_state = EXPECT_ORIGIN_VALUE;
-            else if("type"s == str)
-               current_state = EXPECT_TYPE_VALUE;
-            else
-               current_state = EXPECT_FIRST_OBJECT_DONTCARE_VALUE;
-            return true;
-         }
-         case IN_NESTED_CONTAINER:
-            return true;
-         // default may not be added now, as consensus could be broken.
-      }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "Key: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
-   }
-   bool EndObject(rapidjson::SizeType memberCount) {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_START:
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-         case EXPECT_CHALLENGE_VALUE:
-         case EXPECT_ORIGIN_VALUE:
-         case EXPECT_TYPE_VALUE:
-            return false;
-         case IN_NESTED_CONTAINER:
-            if(!--current_nested_container_depth)
-               current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         case EXPECT_FIRST_OBJECT_KEY:
-            return true;
-         // default may not be added now, as consensus could be broken.
-      }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "EndObject: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
+   bool peek(char expected) const
+   {
+      return _pos < _input.size() && _input[_pos] == expected;
    }
 
-   bool StartArray() {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-            current_state = IN_NESTED_CONTAINER;
-            ++current_nested_container_depth;
-            return true;
-         case IN_NESTED_CONTAINER:
-            ++current_nested_container_depth;
-            return true;
-         case EXPECT_FIRST_OBJECT_START:
-         case EXPECT_FIRST_OBJECT_KEY:
-         case EXPECT_CHALLENGE_VALUE:
-         case EXPECT_ORIGIN_VALUE:
-         case EXPECT_TYPE_VALUE:
-            return false;
-         // default may not be added now, as consensus could be broken.
-      }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "StartArray: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
+   bool peek_digit() const
+   {
+      return _pos < _input.size() && std::isdigit(static_cast<unsigned char>(_input[_pos])) != 0;
+   }
 
-   }
-   bool EndArray(rapidjson::SizeType elementCount) {
-      switch(current_state) {
-         case EXPECT_FIRST_OBJECT_START:
-         case EXPECT_FIRST_OBJECT_DONTCARE_VALUE:
-         case EXPECT_CHALLENGE_VALUE:
-         case EXPECT_ORIGIN_VALUE:
-         case EXPECT_TYPE_VALUE:
-         case EXPECT_FIRST_OBJECT_KEY:
-            return false;
-         case IN_NESTED_CONTAINER:
-            if(!--current_nested_container_depth)
-               current_state = EXPECT_FIRST_OBJECT_KEY;
-            return true;
-         // default may not be added now, as consensus could be broken.
+   void require_digit()
+   {
+      if (!peek_digit()) {
+         fail("expected digit");
       }
-      // Add elog to report the error and __builtin_unreachable to surpress
-      // warning of control reaches end of non-void function.
-      FCL_ASSERT(false, "EndArray: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
-      __builtin_unreachable();
+      ++_pos;
    }
+
+   void skip_ws()
+   {
+      while (_pos < _input.size() && std::isspace(static_cast<unsigned char>(_input[_pos])) != 0) {
+         ++_pos;
+      }
+   }
+
+   [[noreturn]] void fail(const std::string& reason) const
+   {
+      FCL_THROW(
+         "Failed to parse client data JSON",
+         fcl::error::ctx("reason", reason),
+         fcl::error::ctx("offset", _pos));
+   }
+
+   std::string_view _input;
+   std::size_t _pos = 0;
 };
-} //detail
+
+client_data_fields parse_client_data_json(std::string_view input)
+{
+   try {
+      return client_data_json_reader{input}.parse();
+   } catch (const std::invalid_argument& e) {
+      FCL_THROW("Failed to parse client data JSON", fcl::error::ctx("reason", e.what()));
+   }
+}
+
+} // namespace detail
 
 
 public_key::public_key(const signature& c, const fcl::sha256& digest, bool) {
-   detail::webauthn_json_handler handler;
-   detail::rapidjson::Reader reader;
-   detail::rapidjson::StringStream ss(c.client_json.c_str());
-   FCL_ASSERT(reader.Parse<detail::rapidjson::kParseIterativeFlag>(ss, handler), "Failed to parse client data JSON");
+   const auto client_data = detail::parse_client_data_json(c.client_json);
 
-   FCL_ASSERT(handler.found_type == "webauthn.get", "webauthn signature type not an assertion");
+   FCL_ASSERT(client_data.type == "webauthn.get", "webauthn signature type not an assertion");
 
-   std::vector<char> challenge_bytes = fcl::base64url_decode(handler.found_challenge);
+   std::vector<char> challenge_bytes = fcl::base64url_decode(client_data.challenge);
    FCL_ASSERT(fcl::sha256(challenge_bytes.data(), challenge_bytes.size()) == digest, "Wrong webauthn challenge");
 
    char required_origin_scheme[] = "https://";
    size_t https_len = strlen(required_origin_scheme);
-   FCL_ASSERT(handler.found_origin.compare(0, https_len, required_origin_scheme) == 0, "webauthn origin must begin with https://");
-   rpid = handler.found_origin.substr(https_len, handler.found_origin.rfind(':')-https_len);
+   FCL_ASSERT(client_data.origin.compare(0, https_len, required_origin_scheme) == 0, "webauthn origin must begin with https://");
+   rpid = client_data.origin.substr(https_len, client_data.origin.rfind(':') - https_len);
 
    constexpr static size_t min_auth_data_size = 37;
    FCL_ASSERT(c.auth_data.size() >= min_auth_data_size, "auth_data not as large as required");

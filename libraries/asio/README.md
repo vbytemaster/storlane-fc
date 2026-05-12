@@ -99,6 +99,59 @@ auto handle = scheduler.submit({
 co_await handle.wait();
 ```
 
+### Isolate Blocking Work Behind The Scheduler
+
+The scheduler is the boundary for short blocking functions that should not run
+inline on a coroutine hot path. The reusable library still exposes a coroutine
+wait handle instead of `std::future`.
+
+```cpp
+#include <boost/asio/awaitable.hpp>
+
+import fcl.asio.task_scheduler;
+
+boost::asio::awaitable<void> refresh_index(fcl::asio::task_scheduler& scheduler) {
+   auto handle = scheduler.submit({
+      .priority = fcl::asio::priority{25},
+      .name = "index-refresh",
+      .work = [] {
+         rebuild_small_index_from_disk();
+      },
+   });
+
+   co_await handle.wait();
+}
+```
+
+Do not capture stack references in `.work` unless you can prove the work will
+finish before the referenced object goes away.
+
+### Handle Queue Backpressure
+
+`max_pending_tasks` is part of correctness. Callers must handle rejection
+instead of assuming the queue can grow forever.
+
+```cpp
+#include <stdexcept>
+
+auto scheduler = fcl::asio::task_scheduler{
+   runtime,
+   {.max_active_tasks = 1, .max_pending_tasks = 2},
+};
+
+auto accepted = scheduler.submit({
+   .priority = fcl::asio::priority{0},
+   .name = "small-job",
+   .work = [] { do_small_job(); },
+});
+
+try {
+   co_await accepted.wait();
+} catch (const std::runtime_error& error) {
+   report_busy(error.what()); // for example: scheduler queue is full
+}
+```
+
 ### Use Numeric Priorities Without Product Vocabulary
 
 The scheduler only knows numbers. A product can define its own named constants
@@ -132,6 +185,24 @@ auto handle = scheduler.submit_after(
 
 handle.cancel();
 ```
+
+### Use Timers Instead Of Poll Loops
+
+```cpp
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/this_coro.hpp>
+#include <boost/asio/use_awaitable.hpp>
+
+boost::asio::awaitable<void> retry_later() {
+   auto executor = co_await boost::asio::this_coro::executor;
+   auto timer = boost::asio::steady_timer{executor, std::chrono::milliseconds{200}};
+   co_await timer.async_wait(boost::asio::use_awaitable);
+   co_await retry_once();
+}
+```
+
+This keeps cancellation and shutdown visible to the runtime. Avoid background
+threads that sleep and poll shared state.
 
 ### Shut Down Deterministically
 

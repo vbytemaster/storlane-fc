@@ -17,6 +17,7 @@ add_executable(
    crypto/test_hash_functions.cpp
    crypto/test_k1_recover.cpp
    crypto/test_modular_arithmetic.cpp
+   crypto/test_symmetric.cpp
    crypto/test_webauthn.cpp
 )
 
@@ -58,6 +59,7 @@ add_executable(
    crypto/test_hash_functions.cpp
    crypto/test_k1_recover.cpp
    crypto/test_modular_arithmetic.cpp
+   crypto/test_symmetric.cpp
    crypto/test_webauthn.cpp
 )
 target_link_libraries(test_fcl_crypto fcl Boost::included_unit_test_framework)
