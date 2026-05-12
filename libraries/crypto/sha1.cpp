@@ -1,9 +1,20 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/core/fwd_impl.hpp>
-#include <string.h>
-#include <fcl/crypto/sha1.hpp>
-#include <fcl/variant/variant.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+#include <string>
 #include <vector>
+
+module fcl.crypto.sha1;
+
+import fcl.core.utility;
+import fcl.crypto.hex;
+import fcl.exception.exception;
+import fcl.variant;
+
 #include "_digest_common.hpp"
 #include "_evp_digest.hpp"
 
@@ -31,7 +42,8 @@ struct sha1::encoder::impl {
 };
 
 sha1::encoder::~encoder() {}
-sha1::encoder::encoder() {
+sha1::encoder::encoder()
+: my( std::make_unique<impl>() ) {
   reset();
 }
 
@@ -101,4 +113,4 @@ bool operator == ( const sha1& h1, const sha1& h2 ) {
         memset( bi.data(), char(0), sizeof(bi) );
   }
 
-} // fc
+} // namespace fcl

@@ -1,13 +1,46 @@
-#include <fcl/log/log_message.hpp>
-#include <fcl/exception/exception.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/core/time.hpp>
-#include <fcl/core/filesystem.hpp>
-#include <fcl/json/json.hpp>
+module;
+#define BOOST_DLL_USE_STD_FS
+
+#include <boost/dll/runtime_symbol_info.hpp>
+#include <chrono>
+#include <filesystem>
+#include <memory>
+#include <exception>
+#include <string>
+#ifdef __APPLE__
+#include <pthread.h>
+#endif
+#include <stdexcept>
+
+module fcl.log.log_message;
+
+import fcl.variant;
+import fcl.core.chrono;
 
 namespace fcl
 {
-   const std::string& get_thread_name();
+   static thread_local std::string thread_name;
+
+   void set_thread_name( const std::string& name ) {
+      thread_name = name;
+#if defined(__linux__) || defined(__FreeBSD__)
+      pthread_setname_np( pthread_self(), name.c_str() );
+#elif defined(__APPLE__)
+      pthread_setname_np( name.c_str() );
+#endif
+   }
+
+   const std::string& get_thread_name() {
+      if(thread_name.empty()) {
+         try {
+            thread_name = boost::dll::program_location().filename().generic_string();
+         } catch (...) {
+            thread_name = "unknown";
+         }
+      }
+      return thread_name;
+   }
+
    namespace detail
    {
       class log_context_impl
@@ -21,7 +54,7 @@ namespace fcl
             std::string  task_name;
             std::string  hostname;
             std::string  context;
-            time_point   timestamp;
+            std::chrono::sys_time<std::chrono::microseconds> timestamp;
       };
 
       class log_message_impl
@@ -50,7 +83,7 @@ namespace fcl
       my->file        = std::filesystem::path(file).filename().generic_string(); // TODO truncate filename
       my->line        = line;
       my->method      = method;
-      my->timestamp   = time_point::now();
+      my->timestamp   = fcl::chrono::now_us();
       my->thread_name = fcl::get_thread_name();
    }
 
@@ -66,7 +99,7 @@ namespace fcl
        my->thread_name  = obj["thread_name"].as_string();
        if (obj.contains("task_name"))
          my->task_name    = obj["task_name"].as_string();
-       my->timestamp    = obj["timestamp"].as<time_point>();
+       my->timestamp    = obj["timestamp"].as<std::chrono::sys_time<std::chrono::microseconds>>();
        if( obj.contains( "context" ) )
            my->context      = obj["context"].as<std::string>();
    }
@@ -140,10 +173,10 @@ namespace fcl
         else if( v.as_string() == "warn" ) e = log_level::warn;
         else if( v.as_string() == "error" ) e = log_level::error;
         else if( v.as_string() == "off" ) e = log_level::off;
-        else FCL_THROW_EXCEPTION( bad_cast_exception, "Failed to cast from Variant to log_level" );
-      } FCL_RETHROW_EXCEPTIONS( error,
-                                   "Expected 'all|debug|info|warn|error|off', but got '${variant}'",
-                                   ("variant",v) );
+        else throw std::invalid_argument("Failed to cast from Variant to log_level");
+      } catch (const std::exception&) {
+         throw std::invalid_argument("Expected 'all|debug|info|warn|error|off'");
+      }
    }
 
    std::string log_level::to_string()const {
@@ -171,7 +204,7 @@ namespace fcl
    std::string log_context::get_thread_name()const { return my->thread_name; }
    std::string log_context::get_task_name()const   { return my->task_name; }
    std::string log_context::get_host_name()const   { return my->hostname; }
-   time_point  log_context::get_timestamp()const   { return my->timestamp; }
+   std::chrono::sys_time<std::chrono::microseconds> log_context::get_timestamp()const { return my->timestamp; }
    log_level   log_context::get_log_level()const   { return my->level;   }
    std::string log_context::get_context()const     { return my->context; }
 
@@ -234,4 +267,4 @@ namespace fcl
    }
 
 
-} // fc
+} // namespace fcl

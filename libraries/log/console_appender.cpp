@@ -1,18 +1,20 @@
-#include <fcl/log/console_appender.hpp>
-#include <fcl/log/log_message.hpp>
-#include <fcl/core/string.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/reflect/variant.hpp>
+module;
 #ifndef WIN32
 #include <unistd.h>
 #endif
 #define COLOR_CONSOLE 1
 #include "console_defines.h"
-#include <fcl/exception/exception.hpp>
 #include <iomanip>
 #include <mutex>
 #include <sstream>
 
+module fcl.log.console_appender;
+
+import fcl.core.chrono;
+import fcl.log.log_message;
+import fcl.core.string;
+import fcl.variant;
+import fcl.variant.described;
 
 namespace fcl {
 
@@ -42,7 +44,7 @@ namespace fcl {
 
 
    void console_appender::configure( const config& console_appender_config )
-   { try {
+   {
 #ifdef WIN32
       my->console_handle = INVALID_HANDLE_VALUE;
 #endif
@@ -58,7 +60,7 @@ namespace fcl {
             my->lc[i] = color::console_default;
          for( auto itr = my->cfg.level_colors.begin(); itr != my->cfg.level_colors.end(); ++itr )
             my->lc[itr->level] = itr->color;
-   } FCL_CAPTURE_AND_RETHROW( (console_appender_config) ) }
+   }
 
    console_appender::~console_appender() {}
 
@@ -114,7 +116,7 @@ namespace fcl {
       }
       append_fixed_size(line, 5, context.get_log_level().to_string() ); line += ' ';
       // use timestamp of when log message created, note this could cause times on log entries to not be consecutive
-      line += context.get_timestamp().to_iso_string(); line += ' ';
+      line += fcl::chrono::to_iso_string(context.get_timestamp()); line += ' ';
       append_fixed_size(line, 9, context.get_thread_name() ); line += ' ';
       append_fixed_size(line, 29, file_line ); line += ' ';
 

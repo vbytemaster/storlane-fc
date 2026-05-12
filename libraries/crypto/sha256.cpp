@@ -1,20 +1,29 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/crypto/hmac.hpp>
-#include <fcl/core/fwd_impl.hpp>
-#include <string.h>
+module;
+#include <fcl/exception/macros.hpp>
 #include <cmath>
-#include <fcl/crypto/sha256.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/exception/exception.hpp>
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+#include <string>
+
+module fcl.crypto.sha256;
+
+import fcl.core.utility;
+import fcl.crypto.hex;
+import fcl.crypto.hmac;
+import fcl.exception.exception;
+import fcl.variant;
+
 #include "_digest_common.hpp"
 #include "_evp_digest.hpp"
-
 namespace fcl {
 
     sha256::sha256() { memset( _hash, 0, sizeof(_hash) ); }
     sha256::sha256( const char *data, size_t size ) {
        if (size != sizeof(_hash))
-	  FCL_THROW_EXCEPTION( exception, "sha256: size mismatch" );
+	  FCL_THROW("sha256: size mismatch");
        memcpy(_hash, data, size );
     }
     sha256::sha256( const std::string& hex_str ) {
@@ -37,7 +46,8 @@ namespace fcl {
     };
 
     sha256::encoder::~encoder() {}
-    sha256::encoder::encoder() {
+    sha256::encoder::encoder()
+    : my( std::make_unique<impl>() ) {
       reset();
     }
 

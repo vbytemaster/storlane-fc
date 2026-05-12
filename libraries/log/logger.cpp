@@ -1,14 +1,25 @@
-#include <fcl/log/logger.hpp>
-#include <fcl/log/log_message.hpp>
-#include <fcl/log/appender.hpp>
-#include <fcl/exception/exception.hpp>
-#include <fcl/core/filesystem.hpp>
-#include <fcl/log/logger_config.hpp>
+module;
+#include <memory>
+#include <iostream>
+#include <mutex>
+#include <string>
 #include <unordered_map>
+#include <vector>
+
+module fcl.log.logger;
+
+import fcl.log.log_message;
+import fcl.log.appender;
+import fcl.log.logger_config;
+import fcl.core.utility;
 
 namespace fcl {
 
-    inline static logger the_default_logger;
+    static void ensure_default_logging_configured()
+    {
+       static const bool configured = configure_logging( logging_config::default_config() );
+       (void)configured;
+    }
 
     class logger::impl {
       public:
@@ -73,8 +84,6 @@ namespace fcl {
           for( auto itr = my->_appenders.begin(); itr != my->_appenders.end(); ++itr ) {
              try {
                 (*itr)->log( m );
-             } catch( fcl::exception& er ) {
-                std::cerr << "ERROR: logger::log fcl::exception: " << er.to_detail_string() << std::endl;
              } catch( const std::exception& e ) {
                 std::cerr << "ERROR: logger::log std::exception: " << e.what() << std::endl;
              } catch( ... ) {
@@ -92,11 +101,13 @@ namespace fcl {
     std::string logger::get_name()const { return my->_name; }
 
     logger logger::get( const std::string& s ) {
+       ensure_default_logging_configured();
        return log_config::get_logger( s );
     }
 
     logger& logger::default_logger() {
-       return the_default_logger;
+       static logger* the_default_logger = new logger;
+       return *the_default_logger;
     }
 
     void logger::update( const std::string& name, logger& log ) {
@@ -112,8 +123,5 @@ namespace fcl {
     void logger::add_appender( const std::shared_ptr<appender>& a ) {
        my->_appenders.push_back(a);
     }
-
-   bool configure_logging( const logging_config& cfg );
-   bool do_default_config      = configure_logging( logging_config::default_config() );
 
 } // namespace fcl

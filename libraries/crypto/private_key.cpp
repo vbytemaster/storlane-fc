@@ -1,8 +1,25 @@
-#include <fcl/crypto/private_key.hpp>
-#include <fcl/core/utility.hpp>
-#include <fcl/exception/exception.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstring>
+#include <exception>
+#include <string>
+#include <variant>
+#include <vector>
 
-namespace fcl { namespace crypto {
+module fcl.crypto.private_key;
+
+import fcl.core.utility;
+import fcl.crypto.base58;
+import fcl.crypto.common;
+import fcl.crypto.public_key;
+import fcl.crypto.sha256;
+import fcl.crypto.sha512;
+import fcl.crypto.signature;
+import fcl.exception.exception;
+import fcl.variant.static_variant;
+import fcl.variant;
+
+namespace fcl::crypto {
    using namespace std;
 
    struct public_key_visitor : visitor<public_key::storage_type> {
@@ -99,10 +116,13 @@ namespace fcl { namespace crypto {
       } else {
          constexpr auto prefix = config::private_key_base_prefix;
          const auto prefix_str = base58str.substr(0, pivot);
-         FCL_ASSERT(prefix == prefix_str, "Private Key has invalid prefix: ${str}", ("str", base58str)("prefix_str", prefix_str));
+         FCL_ASSERT(prefix == prefix_str,
+                    "Private Key has invalid prefix",
+                    fcl::error::ctx("str", base58str),
+                    fcl::error::ctx("prefix_str", prefix_str));
 
          auto data_str = base58str.substr(pivot + 1);
-         FCL_ASSERT(!data_str.empty(), "Private Key has no data: ${str}", ("str", base58str));
+         FCL_ASSERT(!data_str.empty(), "Private Key has no data: ${str}", fcl::error::ctx("str", base58str));
          return base58_str_parser<private_key::storage_type, config::private_key_prefix>::apply(data_str);
       }
    }
@@ -132,7 +152,7 @@ namespace fcl { namespace crypto {
    {
       return less_comparator<private_key::storage_type>::apply(p1._storage, p2._storage);
    }
-} } // fcl::crypto
+} // namespace fcl::crypto
 
 namespace fcl
 {
@@ -146,4 +166,4 @@ namespace fcl
       vo = fcl::crypto::private_key(var.as_string());
    }
 
-} // fc
+} // namespace fcl

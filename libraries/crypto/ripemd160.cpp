@@ -1,11 +1,22 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/core/fwd_impl.hpp>
-#include <string.h>
-#include <fcl/crypto/ripemd160.hpp>
-#include <fcl/crypto/sha512.hpp>
-#include <fcl/crypto/sha256.hpp>
-#include <fcl/variant/variant.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+#include <string>
 #include <vector>
+
+module fcl.crypto.ripemd160;
+
+import fcl.core.utility;
+import fcl.crypto.hex;
+import fcl.crypto.sha256;
+import fcl.crypto.sha512;
+import fcl.exception.exception;
+import fcl.variant;
+
 #include "_digest_common.hpp"
 #include "_evp_digest.hpp"
 
@@ -32,7 +43,8 @@ struct ripemd160::encoder::impl {
 };
 
 ripemd160::encoder::~encoder() {}
-ripemd160::encoder::encoder() {
+ripemd160::encoder::encoder()
+: my( std::make_unique<impl>() ) {
   reset();
 }
 
@@ -110,4 +122,4 @@ bool operator == ( const ripemd160& h1, const ripemd160& h2 ) {
         memset( bi.data(), char(0), sizeof(bi) );
   }
 
-} // fc
+} // namespace fcl

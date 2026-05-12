@@ -30,11 +30,11 @@
 //#include "config.h"
 //#include <city.h>
 
+module;
 #include <algorithm>
+#include <array>
+#include <stdint.h>
 #include <string.h>  // for memcpy and memset
-#include <fcl/crypto/city.hpp>
-#include <fcl/core/uint128.hpp>
-#include <fcl/core/array.hpp>
 
 #if defined(__SSE4_2__) && defined(__x86_64__)
 #include <nmmintrin.h>
@@ -43,39 +43,6 @@
 uint64_t mm_crc32_u64(uint64_t a, uint64_t b );
 #define MM_CRC32_U64I mm_crc32_u64
 #endif
-
-namespace fcl {
-
-using namespace std;
-
-
-inline uint64_t Uint128Low64(const uint128& x) { return x.low_bits(); }
-inline uint64_t Uint128High64(const uint128& x) { return x.high_bits(); }
-
-// Hash 128 input bits down to 64 bits of output.
-// This is intended to be a reasonably good hash function.
-inline uint64_t Hash128to64(const uint128& x) {
-  // Murmur-inspired hashing.
-  const uint64_t kMul = 0x9ddfea08eb382d69ULL;
-  uint64_t a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
-  a ^= (a >> 47);
-  uint64_t b = (Uint128High64(x) ^ a) * kMul;
-  b ^= (b >> 47);
-  b *= kMul;
-  return b;
-}
-
-static uint64_t UNALIGNED_LOAD64(const char *p) {
-  uint64_t result;
-  memcpy(&result, p, sizeof(result));
-  return result;
-}
-
-static uint32_t UNALIGNED_LOAD32(const char *p) {
-  uint32_t result;
-  memcpy(&result, p, sizeof(result));
-  return result;
-}
 
 #ifdef _WIN32
 
@@ -138,6 +105,43 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 #define LIKELY(x) (x)
 #endif
 #endif
+
+module fcl.crypto.city;
+
+import fcl.core.uint128;
+
+namespace fcl {
+
+using namespace std;
+
+
+inline uint64_t Uint128Low64(const uint128& x) { return x.low_bits(); }
+inline uint64_t Uint128High64(const uint128& x) { return x.high_bits(); }
+
+// Hash 128 input bits down to 64 bits of output.
+// This is intended to be a reasonably good hash function.
+inline uint64_t Hash128to64(const uint128& x) {
+  // Murmur-inspired hashing.
+  const uint64_t kMul = 0x9ddfea08eb382d69ULL;
+  uint64_t a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
+  a ^= (a >> 47);
+  uint64_t b = (Uint128High64(x) ^ a) * kMul;
+  b ^= (b >> 47);
+  b *= kMul;
+  return b;
+}
+
+static uint64_t UNALIGNED_LOAD64(const char *p) {
+  uint64_t result;
+  memcpy(&result, p, sizeof(result));
+  return result;
+}
+
+static uint32_t UNALIGNED_LOAD32(const char *p) {
+  uint32_t result;
+  memcpy(&result, p, sizeof(result));
+  return result;
+}
 
 static uint64_t Fetch64(const char *p) {
   return uint64_in_expected_order(UNALIGNED_LOAD64(p));
@@ -650,9 +654,9 @@ void CityHashCrc256(const char *s, size_t len, uint64_t *result) {
   }
 }
 
-array<uint64_t,4> city_hash_crc_256(const char *s, size_t len)
+std::array<uint64_t,4> city_hash_crc_256(const char *s, size_t len)
 {
-   array<uint64_t,4> buf;
+   std::array<uint64_t,4> buf;
    CityHashCrc256( s, len, (uint64_t*)&buf );
    return buf;
 }

@@ -1,24 +1,141 @@
 add_executable(
    test_fcl
    unit/main.cpp
-   ../libraries/core/tests/test_escape_str.cpp
-   ../libraries/core/tests/test_scoped_exit.cpp
-   ../libraries/variant/tests/test_static_variant.cpp
-   ../libraries/variant/tests/test_variant.cpp
-   ../libraries/variant/tests/test_variant_dynamic_bitset.cpp
-   ../libraries/variant/tests/test_variant_estimated_size.cpp
-   ../libraries/raw/tests/test_raw.cpp
-   ../libraries/json/tests/test_json.cpp
-   ../libraries/crypto/tests/test_base64.cpp
-   ../libraries/crypto/tests/test_blake2.cpp
-   ../libraries/crypto/tests/test_bls.cpp
-   ../libraries/crypto/tests/test_bls_legacy.cpp
-   ../libraries/crypto/tests/test_cypher_suites.cpp
-   ../libraries/crypto/tests/test_hash_functions.cpp
-   ../libraries/crypto/tests/test_k1_recover.cpp
-   ../libraries/crypto/tests/test_modular_arithmetic.cpp
-   ../libraries/crypto/tests/test_webauthn.cpp
+   core/test_chrono.cpp
+   core/test_escape_str.cpp
+   variant/test_static_variant.cpp
+   variant/test_variant.cpp
+   variant/test_variant_dynamic_bitset.cpp
+   variant/test_variant_estimated_size.cpp
+   raw/test_raw.cpp
+   json/test_json.cpp
+   crypto/test_base64.cpp
+   crypto/test_blake2.cpp
+   crypto/test_bls.cpp
+   crypto/test_bls_legacy.cpp
+   crypto/test_cypher_suites.cpp
+   crypto/test_hash_functions.cpp
+   crypto/test_k1_recover.cpp
+   crypto/test_modular_arithmetic.cpp
+   crypto/test_webauthn.cpp
 )
 
 target_link_libraries(test_fcl fcl Boost::included_unit_test_framework)
 add_test(NAME test_fcl COMMAND test_fcl WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_exception
+   unit/main.cpp
+   exception/exception_tests.cpp
+)
+target_link_libraries(test_fcl_exception fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_exception COMMAND test_fcl_exception WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_json
+   unit/main.cpp
+   json/test_json.cpp
+)
+target_link_libraries(test_fcl_json fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_json COMMAND test_fcl_json WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_raw
+   unit/main.cpp
+   raw/test_raw.cpp
+)
+target_link_libraries(test_fcl_raw fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_raw COMMAND test_fcl_raw WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_crypto
+   unit/main.cpp
+   crypto/test_base64.cpp
+   crypto/test_blake2.cpp
+   crypto/test_bls.cpp
+   crypto/test_bls_legacy.cpp
+   crypto/test_cypher_suites.cpp
+   crypto/test_hash_functions.cpp
+   crypto/test_k1_recover.cpp
+   crypto/test_modular_arithmetic.cpp
+   crypto/test_webauthn.cpp
+)
+target_link_libraries(test_fcl_crypto fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_crypto COMMAND test_fcl_crypto WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_asio
+   unit/main.cpp
+   asio/task_scheduler_tests.cpp
+)
+target_link_libraries(test_fcl_asio fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_asio COMMAND test_fcl_asio WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_app
+   unit/main.cpp
+   app/app_tests.cpp
+)
+target_link_libraries(test_fcl_app fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_app COMMAND test_fcl_app WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_schema
+   unit/main.cpp
+   schema/schema_tests.cpp
+)
+target_link_libraries(test_fcl_schema fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_schema COMMAND test_fcl_schema WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_config
+   unit/main.cpp
+   config/config_tests.cpp
+)
+target_link_libraries(test_fcl_config fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_config COMMAND test_fcl_config WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_yaml
+   unit/main.cpp
+   yaml/yaml_tests.cpp
+)
+target_link_libraries(test_fcl_yaml fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_yaml COMMAND test_fcl_yaml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_program_options
+   unit/main.cpp
+   program_options/program_options_tests.cpp
+)
+target_link_libraries(test_fcl_program_options fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_program_options COMMAND test_fcl_program_options WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_http_websocket
+   unit/main.cpp
+   http_websocket/network_tests.cpp
+)
+target_link_libraries(test_fcl_http_websocket fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_http_websocket COMMAND test_fcl_http_websocket WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(
+   test_fcl_quic_p2p
+   unit/main.cpp
+   quic_p2p/quic_tests.cpp
+   quic_p2p/p2p_tests.cpp
+)
+target_link_libraries(test_fcl_quic_p2p fcl Boost::included_unit_test_framework)
+add_test(NAME test_fcl_quic_p2p COMMAND test_fcl_quic_p2p WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+if(TARGET fcl_tui)
+   add_executable(
+      test_fcl_tui
+      unit/main.cpp
+      tui/tui_tests.cpp
+   )
+   target_link_libraries(test_fcl_tui fcl fcl_tui Boost::included_unit_test_framework)
+   add_test(NAME test_fcl_tui COMMAND test_fcl_tui WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+else()
+   message(STATUS "Skipping test_fcl_tui: fcl_tui is not available")
+endif()

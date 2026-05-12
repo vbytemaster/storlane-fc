@@ -1,303 +1,259 @@
-#include <fcl/exception/exception.hpp>
-#include <boost/exception/all.hpp>
-#include <fcl/log/logger.hpp>
-#include <fcl/json/json.hpp>
-
+module;
+#include <exception>
 #include <iostream>
+#include <mutex>
+#include <source_location>
+#include <sstream>
+#include <system_error>
+#include <utility>
 
-namespace fcl
+module fcl.exception.exception;
+
+namespace {
+
+std::mutex& sink_mutex()
 {
-   namespace detail
-   {
-      class exception_impl
-      {
-         public:
-            exception_impl(std::string_view name_value,
-                        std::string_view what_value,
-                        int64_t code,
-                        log_messages msgs)
-            : _name(name_value)
-            , _what(what_value)
-            , _code(code)
-            , _elog(std::move(msgs))
-            {}
+   static std::mutex mutex;
+   return mutex;
+}
 
-            std::string     _name;
-            std::string     _what;
-            int64_t         _code;
-            log_messages    _elog;
-      };
+fcl::error::log_sink& sink_ref()
+{
+   static fcl::error::log_sink sink;
+   return sink;
+}
+
+std::string sanitize_value(std::string_view value, bool redacted)
+{
+   if (redacted) {
+      return "<redacted>";
    }
-   exception::exception( log_messages&& msgs,
-                         int64_t code,
-                         std::string_view name_value,
-                         std::string_view what_value )
-   :my( new detail::exception_impl{name_value, what_value, code, std::move(msgs)} )
-   {
+   return std::string(value);
+}
+
+void append_exception_chain(std::ostream& out, const std::exception& exception, int depth)
+{
+   for (int i = 0; i < depth; ++i) {
+      out << "caused by: ";
    }
 
-   exception::exception(
-      const log_messages& msgs,
-      int64_t code,
-      std::string_view name_value,
-      std::string_view what_value )
-   :my( new detail::exception_impl{name_value, what_value, code, msgs} )
-   {
+   if (const auto* context = dynamic_cast<const fcl::error::context_error*>(&exception)) {
+      out << context->what();
+   } else {
+      out << exception.what();
    }
 
-   unhandled_exception::unhandled_exception( log_message&& m, std::exception_ptr e )
-   :exception( std::move(m) )
-   {
-      _inner = e;
-   }
-   unhandled_exception::unhandled_exception( const exception& r )
-   :exception(r)
-   {
-   }
-   unhandled_exception::unhandled_exception( log_messages m )
-   :exception()
-   { my->_elog = std::move(m); }
-
-   std::exception_ptr unhandled_exception::get_inner_exception()const { return _inner; }
-
-   std::shared_ptr<exception> unhandled_exception::dynamic_copy_exception()const
-   {
-      auto e = std::make_shared<unhandled_exception>( *this );
-      e->_inner = _inner;
-      return e;
-   }
-
-   exception::exception( int64_t code,
-                         std::string_view name_value,
-                         std::string_view what_value )
-   :my( new detail::exception_impl{name_value, what_value, code, {}} )
-   {
-   }
-
-   exception::exception( log_message&& msg,
-                         int64_t code,
-                         std::string_view name_value,
-                         std::string_view what_value )
-   :my( new detail::exception_impl{name_value, what_value, code, {std::move(msg)}} )
-   {
-   }
-   exception::exception( const exception& c )
-   :my( new detail::exception_impl(*c.my) )
-   { }
-   exception::exception( exception&& c ) noexcept = default;
-
-   const char*  exception::name()const throw() { return my->_name.c_str(); }
-   const char*  exception::what()const noexcept { return my->_what.c_str(); }
-   int64_t      exception::code()const throw() { return my->_code;         }
-
-   exception::~exception(){}
-
-   void to_variant( const exception& e, variant& v )
-   {
-      v = mutable_variant_object( "code", e.code() )
-                                ( "name", e.name() )
-                                ( "message", e.what() )
-                                ( "stack", e.get_log() );
-
-   }
-   void          from_variant( const variant& v, exception& ll )
-   {
-      const auto& obj = v.get_object();
-      if( obj.contains( "stack" ) )
-         ll.my->_elog =  obj["stack"].as<log_messages>();
-      if( obj.contains( "code" ) )
-         ll.my->_code = obj["code"].as_int64();
-      if( obj.contains( "name" ) )
-         ll.my->_name = obj["name"].as_string();
-      if( obj.contains( "message" ) )
-         ll.my->_what = obj["message"].as_string();
-   }
-
-   const log_messages&   exception::get_log()const { return my->_elog; }
-   void                  exception::append_log( log_message m )
-   {
-      my->_elog.emplace_back( std::move(m) );
-   }
-
-   /**
-    *   Generates a detailed string including file, line, method,
-    *   and other information that is generally only useful for
-    *   developers.
-    */
-   std::string exception::to_detail_string( log_level ll  )const
-   {
-      const auto deadline = fcl::time_point::now() + format_time_limit;
-      std::stringstream ss;
-      try {
-         try {
-            ss << variant( my->_code ).as_string();
-         } catch( std::bad_alloc& ) {
-            throw;
-         } catch( ... ) {
-            ss << "<- exception in to_detail_string.";
-         }
-         ss << " " << my->_name << ": " << my->_what << "\n";
-         for( auto itr = my->_elog.begin(); itr != my->_elog.end(); ++itr ) {
-            try {
-               ss << itr->get_message() << "\n"; //fcl::format_string( itr->get_format(), itr->get_data() ) <<"\n";
-               ss << "    " << json::to_string( itr->get_data(), deadline ) << "\n";
-               ss << "    " << itr->get_context().to_string() << "\n";
-            } catch( std::bad_alloc& ) {
-               throw;
-            } catch( const fcl::timeout_exception& e) {
-               ss << "<- timeout exception in to_detail_string: " << e.what() << "\n";
-               break;
-            } catch( ... ) {
-               ss << "<- exception in to_detail_string.\n";
-            }
-         }
-      } catch( std::bad_alloc& ) {
-         throw;
-      } catch( ... ) {
-         ss << "<- exception in to_detail_string.\n";
+   try {
+      std::rethrow_if_nested(exception);
+   } catch (const std::exception& nested) {
+      out << '\n';
+      append_exception_chain(out, nested, depth + 1);
+   } catch (...) {
+      out << "\n";
+      for (int i = 0; i <= depth; ++i) {
+         out << "caused by: ";
       }
-      return ss.str();
+      out << "<unknown non-std exception>";
+   }
+}
+
+} // namespace
+
+namespace fcl::error {
+
+field ctx(std::string_view key, std::string value)
+{
+   return field{std::string(key), std::move(value), false};
+}
+
+field ctx(std::string_view key, std::string_view value)
+{
+   return ctx(key, std::string(value));
+}
+
+field ctx(std::string_view key, const char* value)
+{
+   return ctx(key, value ? std::string(value) : std::string("<null>"));
+}
+
+field ctx(std::string_view key, bool value) { return ctx(key, value ? "true" : "false"); }
+field ctx(std::string_view key, char value) { return ctx(key, std::string(1, value)); }
+field ctx(std::string_view key, signed char value) { return ctx(key, static_cast<long long>(value)); }
+field ctx(std::string_view key, unsigned char value) { return ctx(key, static_cast<unsigned long long>(value)); }
+field ctx(std::string_view key, short value) { return ctx(key, static_cast<long long>(value)); }
+field ctx(std::string_view key, unsigned short value) { return ctx(key, static_cast<unsigned long long>(value)); }
+field ctx(std::string_view key, int value) { return ctx(key, static_cast<long long>(value)); }
+field ctx(std::string_view key, unsigned value) { return ctx(key, static_cast<unsigned long long>(value)); }
+field ctx(std::string_view key, long value) { return ctx(key, static_cast<long long>(value)); }
+field ctx(std::string_view key, unsigned long value) { return ctx(key, static_cast<unsigned long long>(value)); }
+field ctx(std::string_view key, long long value) { return ctx(key, std::to_string(value)); }
+field ctx(std::string_view key, unsigned long long value) { return ctx(key, std::to_string(value)); }
+field ctx(std::string_view key, float value) { return ctx(key, std::to_string(value)); }
+field ctx(std::string_view key, double value) { return ctx(key, std::to_string(value)); }
+field ctx(std::string_view key, long double value) { return ctx(key, std::to_string(static_cast<double>(value))); }
+
+field secret(std::string_view key, std::string value)
+{
+   static_cast<void>(value);
+   return field{std::string(key), "<redacted>", true};
+}
+
+field secret(std::string_view key, std::string_view value)
+{
+   return secret(key, std::string(value));
+}
+
+field secret(std::string_view key, const char* value)
+{
+   return secret(key, value ? std::string(value) : std::string{});
+}
+
+std::string format_fields(const fields& context)
+{
+   if (context.empty()) {
+      return {};
    }
 
-   /**
-    *   Generates a user-friendly error report.
-    */
-   std::string exception::to_string( log_level ll   )const
-   {
-      const auto deadline = fcl::time_point::now() + format_time_limit;
-      std::stringstream ss;
-      try {
-         ss << my->_what;
-         try {
-            ss << " (" << variant( my->_code ).as_string() << ")\n";
-         } catch( std::bad_alloc& ) {
-            throw;
-         } catch( ... ) {
-            ss << "<- exception in to_string.\n";
-         }
-         for( auto itr = my->_elog.begin(); itr != my->_elog.end(); ++itr ) {
-            try {
-               FCL_CHECK_DEADLINE(deadline);
-               ss << fcl::format_string( itr->get_format(), itr->get_data(), true) << "\n";
-               //      ss << "    " << itr->get_context().to_string() <<"\n";
-            } catch( std::bad_alloc& ) {
-               throw;
-            } catch( const fcl::timeout_exception& e) {
-               ss << "<- timeout exception in to_string: " << e.what();
-               break;
-            } catch( ... ) {
-               ss << "<- exception in to_string.\n";
-            }
-         }
-         return ss.str();
-      } catch( std::bad_alloc& ) {
-         throw;
-      } catch( ... ) {
-         ss << "<- exception in to_string.\n";
+   std::ostringstream out;
+   bool first = true;
+   for (const auto& item : context) {
+      if (!first) {
+         out << ", ";
       }
-      return ss.str();
+      first = false;
+      out << item.key << '=' << sanitize_value(item.value, item.redacted);
+   }
+   return out.str();
+}
+
+std::string format_context_message(
+   std::string_view message,
+   const fields& context,
+   const std::source_location& location,
+   const std::error_code& code)
+{
+   std::ostringstream out;
+   out << message;
+
+   if (code) {
+      out << " [" << code.category().name() << ':' << code.value() << " " << code.message() << ']';
    }
 
-   /**
-    *   Generates a user-friendly error report.
-    */
-   std::string exception::top_message( )const
-   {
-      for( auto itr = my->_elog.begin(); itr != my->_elog.end(); ++itr )
-      {
-         auto s = fcl::format_string( itr->get_format(), itr->get_data() );
-         if (!s.empty()) {
-            return s;
-         }
+   const auto formatted_fields = format_fields(context);
+   if (!formatted_fields.empty()) {
+      out << " {" << formatted_fields << '}';
+   }
+
+   if (location.file_name() && location.file_name()[0] != '\0') {
+      out << " at " << location.file_name() << ':' << location.line();
+   }
+
+   return out.str();
+}
+
+context_error::context_error(
+   std::string message,
+   fields context,
+   std::source_location location,
+   std::error_code code)
+   : std::runtime_error(format_context_message(message, context, location, code))
+   , _message(std::move(message))
+   , _context(std::move(context))
+   , _location(location)
+   , _code(std::move(code))
+{
+}
+
+const std::string& context_error::message() const noexcept { return _message; }
+const fields& context_error::context() const noexcept { return _context; }
+const std::source_location& context_error::location() const noexcept { return _location; }
+const std::error_code& context_error::code() const noexcept { return _code; }
+
+std::string format_exception_chain(const std::exception& exception)
+{
+   std::ostringstream out;
+   append_exception_chain(out, exception, 0);
+   return out.str();
+}
+
+std::string format_current_exception()
+{
+   try {
+      throw;
+   } catch (const std::exception& exception) {
+      return format_exception_chain(exception);
+   } catch (...) {
+      return "<unknown non-std exception>";
+   }
+}
+
+void set_log_sink(log_sink sink)
+{
+   std::lock_guard lock(sink_mutex());
+   sink_ref() = std::move(sink);
+}
+
+void log_current_exception(std::string_view message, fields context)
+{
+   std::ostringstream out;
+   if (!message.empty()) {
+      out << message;
+      const auto formatted_fields = format_fields(context);
+      if (!formatted_fields.empty()) {
+         out << " {" << formatted_fields << '}';
       }
-      return std::string();
+      out << ": ";
    }
+   out << format_current_exception();
 
-   exception_ptr exception::dynamic_copy_exception()const
-   {
-       return std::make_shared<exception>(*this);
+   std::lock_guard lock(sink_mutex());
+   if (sink_ref()) {
+      sink_ref()(out.str());
+   } else {
+      std::cerr << out.str() << '\n';
    }
+}
 
-   std::string except_str()
-   {
-       return boost::current_exception_diagnostic_information();
-   }
+void throw_context_error(
+   std::string_view message,
+   fields context,
+   std::source_location location,
+   std::error_code code)
+{
+   throw context_error(std::string(message), std::move(context), location, std::move(code));
+}
 
-   void throw_bad_enum_cast( int64_t i, const char* e )
-   {
-      FCL_THROW_EXCEPTION( bad_cast_exception,
-                          "invalid index '${key}' in enum '${enum}'",
-                          ("key",i)("enum",e) );
+void throw_assertion_error(
+   std::string_view expression,
+   std::string_view message,
+   fields context,
+   std::source_location location)
+{
+   context.insert(context.begin(), ctx("expression", expression));
+   if (message.empty()) {
+      throw context_error("assertion failed", std::move(context), location, std::make_error_code(std::errc::invalid_argument));
    }
-   void throw_bad_enum_cast( const char* k, const char* e )
-   {
-      FCL_THROW_EXCEPTION( bad_cast_exception,
-                          "invalid name '${key}' in enum '${enum}'",
-                          ("key",k)("enum",e) );
-   }
+   throw context_error(std::string(message), std::move(context), location, std::make_error_code(std::errc::invalid_argument));
+}
 
-   bool assert_optional(bool is_valid )
-   {
-      if( !is_valid )
-         throw null_optional();
-      return true;
-   }
-   exception& exception::operator=( const exception& copy )
-   {
-      *my = *copy.my;
-      return *this;
-   }
+void throw_timeout_error(
+   std::string_view message,
+   fields context,
+   std::source_location location)
+{
+   throw context_error(
+      message.empty() ? "deadline exceeded" : std::string(message),
+      std::move(context),
+      location,
+      std::make_error_code(std::errc::timed_out));
+}
 
-   exception& exception::operator=( exception&& copy )
-   {
-      my = std::move(copy.my);
-      return *this;
-   }
+void rethrow_with_context(
+   std::string_view message,
+   fields context,
+   std::source_location location)
+{
+   std::throw_with_nested(context_error(std::string(message), std::move(context), location));
+}
 
-   void record_assert_trip(
-      const char* filename,
-      uint32_t lineno,
-      const char* expr
-      )
-   {
-      fcl::mutable_variant_object assert_trip_info =
-         fcl::mutable_variant_object()
-         ("source_file", filename)
-         ("source_lineno", lineno)
-         ("expr", expr)
-         ;
-      /* TODO: restore this later
-      std::cout
-         << "FCL_ASSERT triggered:  "
-         << fcl::json::to_string( assert_trip_info ) << "\n";
-         */
-      return;
-   }
-
-   bool enable_record_assert_trip = false;
-
-   std_exception_wrapper::std_exception_wrapper( log_message&& m, std::exception_ptr e,
-                                                 const std::string& name_value,
-                                                 const std::string& what_value)
-   :exception( std::move(m), exception_code::std_exception_code, name_value, what_value )
-   {
-      _inner = {std::move(e)};
-   }
-
-   std_exception_wrapper std_exception_wrapper::from_current_exception(const std::exception& e)
-   {
-     return std_exception_wrapper{FCL_LOG_MESSAGE(warn, "rethrow ${what}: ", ("what",e.what())),
-                                  std::current_exception(),
-                                  BOOST_CORE_TYPEID(e).name(),
-                                  e.what()};
-   }
-
-   std::exception_ptr std_exception_wrapper::get_inner_exception()const { return _inner; }
-
-   std::shared_ptr<exception> std_exception_wrapper::dynamic_copy_exception()const
-   {
-      auto e = std::make_shared<std_exception_wrapper>( *this );
-      e->_inner = _inner;
-      return e;
-   }
-} // fc
+} // namespace fcl::error

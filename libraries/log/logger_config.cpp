@@ -1,15 +1,17 @@
-#include <fcl/log/logger_config.hpp>
-#include <fcl/log/appender.hpp>
-#include <fcl/json/json.hpp>
-#include <fcl/core/filesystem.hpp>
+module;
+
+#include <filesystem>
+#include <iostream>
+#include <mutex>
+#include <stdexcept>
 #include <unordered_map>
 #include <string>
-#include <fcl/log/console_appender.hpp>
-#include <fcl/reflect/variant.hpp>
-#include <fcl/exception/exception.hpp>
 
-#define BOOST_DLL_USE_STD_FS
-#include <boost/dll/runtime_symbol_info.hpp>
+module fcl.log.logger_config;
+
+import fcl.log.appender;
+import fcl.log.console_appender;
+import fcl.variant.described;
 
 namespace fcl {
 
@@ -32,7 +34,7 @@ namespace fcl {
    }
 
    void log_config::update_logger( const std::string& name, logger& log ) {
-      update_logger_with_default(name, log, DEFAULT_LOGGER);
+      update_logger_with_default(name, log, default_logger_name);
    }
 
    void log_config::update_logger_with_default( const std::string& name, logger& log, const std::string& default_name ) {
@@ -55,7 +57,8 @@ namespace fcl {
    }
 
    void configure_logging( const std::filesystem::path& lc ) {
-      configure_logging( fcl::json::from_file<logging_config>(lc) );
+      static_cast<void>(lc);
+      throw std::runtime_error("file-based logging config parsing is not part of fcl_log");
    }
    bool configure_logging( const logging_config& cfg ) {
       return log_config::configure_logging( cfg );
@@ -69,7 +72,7 @@ namespace fcl {
       log_config::get().logger_map.clear();
       log_config::get().appender_map.clear();
 
-      logger::default_logger() = log_config::get().logger_map[DEFAULT_LOGGER];
+      logger::default_logger() = log_config::get().logger_map[default_logger_name];
       logger& default_logger = logger::default_logger();
 
       for( size_t i = 0; i < cfg.appenders.size(); ++i ) {
@@ -85,13 +88,13 @@ namespace fcl {
       for (bool first_pass = true; ; first_pass = false) { // process default first
          for( size_t i = 0; i < cfg.loggers.size(); ++i ) {
             auto lgr = log_config::get().logger_map[cfg.loggers[i].name];
-            if (first_pass && cfg.loggers[i].name != DEFAULT_LOGGER)
+            if (first_pass && cfg.loggers[i].name != default_logger_name)
                continue;
-            if (!first_pass && cfg.loggers[i].name == DEFAULT_LOGGER)
+            if (!first_pass && cfg.loggers[i].name == default_logger_name)
                continue;
 
             lgr.set_name(cfg.loggers[i].name);
-            if (lgr.get_name() != DEFAULT_LOGGER) {
+            if (lgr.get_name() != default_logger_name) {
                lgr.set_parent(default_logger);
             }
             if( cfg.loggers[i].enabled ) {
@@ -116,9 +119,9 @@ namespace fcl {
             break;
       }
       return reg_console_appender;
-      } catch ( exception& e )
+      } catch ( const std::exception& e )
       {
-         std::cerr<<e.to_detail_string()<<"\n";
+         std::cerr << e.what() << "\n";
       }
       return false;
    }
@@ -146,31 +149,11 @@ namespace fcl {
                  ) );
 
       logger_config dlc;
-      dlc.name = DEFAULT_LOGGER;
+      dlc.name = default_logger_name;
       dlc.level = log_level::info;
       dlc.appenders.push_back("stderr");
       cfg.loggers.push_back( dlc );
       return cfg;
    }
 
-   static thread_local std::string thread_name;
-
-   void set_thread_name( const std::string& name ) {
-      thread_name = name;
-#if defined(__linux__) || defined(__FreeBSD__)
-      pthread_setname_np( pthread_self(), name.c_str() );
-#elif defined(__APPLE__)
-      pthread_setname_np( name.c_str() );
-#endif
-   }
-   const std::string& get_thread_name() {
-      if(thread_name.empty()) {
-         try {
-            thread_name = boost::dll::program_location().filename().generic_string();
-         } catch (...) {
-            thread_name = "unknown";
-         }
-      }
-      return thread_name;
-   }
 }

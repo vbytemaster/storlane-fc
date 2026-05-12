@@ -1,14 +1,108 @@
-#include <fcl/variant/variant.hpp>
-#include <fcl/variant/variant_object.hpp>
-#include <fcl/exception/exception.hpp>
+module;
 #include <string.h>
-#include <fcl/crypto/base64.hpp>
-#include <fcl/crypto/hex.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/scoped_array.hpp>
-#include <fcl/reflect/variant.hpp>
-#include <fcl/json/json.hpp>
-#include <fcl/core/utf8.hpp>
 #include <algorithm>
+#include <exception>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+#include <stdexcept>
+#include <string_view>
+#include <vector>
+
+#include <fcl/core/macros.hpp>
+
+module fcl.variant.value;
+
+import fcl.core.string;
+import fcl.core.utf8;
+
+namespace {
+
+constexpr char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+std::string variant_base64_encode(const char* data, std::size_t size) {
+   std::string out;
+   out.reserve(((size + 2) / 3) * 4);
+   for (std::size_t i = 0; i < size; i += 3) {
+      const auto b0 = static_cast<unsigned char>(data[i]);
+      const auto b1 = (i + 1 < size) ? static_cast<unsigned char>(data[i + 1]) : 0;
+      const auto b2 = (i + 2 < size) ? static_cast<unsigned char>(data[i + 2]) : 0;
+      out.push_back(base64_chars[b0 >> 2]);
+      out.push_back(base64_chars[((b0 & 0x03) << 4) | (b1 >> 4)]);
+      out.push_back((i + 1 < size) ? base64_chars[((b1 & 0x0f) << 2) | (b2 >> 6)] : '=');
+      out.push_back((i + 2 < size) ? base64_chars[b2 & 0x3f] : '=');
+   }
+   return out;
+}
+
+int variant_base64_value(char c) {
+   if (c >= 'A' && c <= 'Z') return c - 'A';
+   if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+   if (c >= '0' && c <= '9') return c - '0' + 52;
+   if (c == '+') return 62;
+   if (c == '/') return 63;
+   if (c == '=') return -2;
+   return -1;
+}
+
+std::vector<char> variant_base64_decode(std::string_view input) {
+   std::vector<char> out;
+   int val = 0;
+   int valb = -8;
+   for (char c : input) {
+      const int decoded = variant_base64_value(c);
+      if (decoded == -2) {
+         break;
+      }
+      if (decoded < 0) {
+         throw std::invalid_argument("encountered non-base64 character");
+      }
+      val = (val << 6) + decoded;
+      valb += 6;
+      if (valb >= 0) {
+         out.push_back(static_cast<char>((val >> valb) & 0xff));
+         valb -= 8;
+      }
+   }
+   return out;
+}
+
+char variant_hex_char(unsigned value) {
+   return static_cast<char>(value < 10 ? ('0' + value) : ('a' + value - 10));
+}
+
+std::string variant_to_hex(const char* data, std::size_t size) {
+   std::string out;
+   out.reserve(size * 2);
+   for (std::size_t i = 0; i < size; ++i) {
+      const auto byte = static_cast<unsigned char>(data[i]);
+      out.push_back(variant_hex_char(byte >> 4));
+      out.push_back(variant_hex_char(byte & 0x0f));
+   }
+   return out;
+}
+
+unsigned variant_from_hex_char(char c) {
+   if (c >= '0' && c <= '9') return static_cast<unsigned>(c - '0');
+   if (c >= 'a' && c <= 'f') return static_cast<unsigned>(c - 'a' + 10);
+   if (c >= 'A' && c <= 'F') return static_cast<unsigned>(c - 'A' + 10);
+   throw std::invalid_argument("invalid hex character");
+}
+
+std::size_t variant_from_hex(std::string_view input, char* output, std::size_t output_size) {
+   const auto count = input.size() / 2;
+   if (count > output_size) {
+      throw std::out_of_range("hex output buffer too small");
+   }
+   for (std::size_t i = 0; i < count; ++i) {
+      output[i] = static_cast<char>((variant_from_hex_char(input[2 * i]) << 4) | variant_from_hex_char(input[2 * i + 1]));
+   }
+   return count;
+}
+
+} // namespace
 
 namespace fcl
 {
@@ -297,7 +391,7 @@ void  variant::visit( const visitor& v )const
          v.handle( **reinterpret_cast<const const_blob_ptr*>(this) );
          return;
       default:
-         FCL_THROW_EXCEPTION( assert_exception, "Invalid Type / Corrupted Memory" );
+         throw std::runtime_error("Invalid Type / Corrupted Memory");
    }
 }
 
@@ -391,12 +485,12 @@ int64_t variant::as_int64()const
       case null_type:
           return 0;
       default:
-         FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to int64", ("type", get_type()) );
+         throw std::bad_cast();
    }
 }
 
 uint64_t variant::as_uint64()const
-{ try {
+{
    switch( get_type() )
    {
       case string_type:
@@ -412,9 +506,9 @@ uint64_t variant::as_uint64()const
       case null_type:
           return 0;
       default:
-         FCL_THROW_EXCEPTION( bad_cast_exception,"Invalid cast from ${type} to uint64", ("type",get_type()));
+         throw std::bad_cast();
    }
-} FCL_CAPTURE_AND_RETHROW( (*this) ) }
+}
 
 
 double  variant::as_double()const
@@ -434,7 +528,7 @@ double  variant::as_double()const
       case null_type:
           return 0;
       default:
-         FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to double", ("type",get_type()) );
+         throw std::bad_cast();
    }
 }
 
@@ -449,7 +543,7 @@ bool  variant::as_bool()const
              return true;
           if( s == "false" )
              return false;
-          FCL_THROW_EXCEPTION( bad_cast_exception, "Cannot convert string to bool (only \"true\" or \"false\" can be converted)" );
+          throw std::bad_cast();
       }
       case double_type:
           return *reinterpret_cast<const double*>(this) != 0.0;
@@ -462,7 +556,7 @@ bool  variant::as_bool()const
       case null_type:
           return false;
       default:
-         FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to bool" , ("type",get_type()));
+         throw std::bad_cast();
    }
 }
 
@@ -490,12 +584,12 @@ std::string variant::as_string()const
           return *reinterpret_cast<const bool*>(this) ? "true" : "false";
       case blob_type:
           if( get_blob().data.size() )
-             return base64_encode( get_blob().data.data(), get_blob().data.size() );
+             return variant_base64_encode( get_blob().data.data(), get_blob().data.size() );
           return std::string();
       case null_type:
           return std::string();
       default:
-      FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to string", ("type", get_type() ) );
+      throw std::bad_cast();
    }
 }
 
@@ -506,21 +600,21 @@ variants&         variant::get_array()
   if( get_type() == array_type )
      return **reinterpret_cast<variants**>(this);
 
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Array", ("type",get_type()) );
+  throw std::bad_cast();
 }
 blob&         variant::get_blob()
 {
   if( get_type() == blob_type )
      return **reinterpret_cast<blob**>(this);
 
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Blob", ("type",get_type()) );
+  throw std::bad_cast();
 }
 const blob&         variant::get_blob()const
 {
   if( get_type() == blob_type )
      return **reinterpret_cast<const const_blob_ptr*>(this);
 
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Blob", ("type",get_type()) );
+  throw std::bad_cast();
 }
 
 blob variant::as_blob()const
@@ -535,9 +629,9 @@ blob variant::as_blob()const
          if( str.size() == 0 ) return blob();
          try {
             // pre-5.0 versions of variant added `=` to end of base64 encoded string in as_string() above.
-            // fc version of base64_decode allows for extra `=` at the end of the string.
+            // Keep legacy base64_decode behavior: extra trailing `=` is accepted.
             // Other base64 decoders will not accept the extra `=`.
-            std::vector<char> b64 = base64_decode( str );
+            std::vector<char> b64 = variant_base64_decode( str );
             return { std::move(b64) };
          } catch(const std::exception&) {
             // unable to decode, return the raw chars
@@ -546,7 +640,7 @@ blob variant::as_blob()const
       }
       case object_type:
       case array_type:
-         FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Blob", ("type",get_type()) );
+         throw std::bad_cast();
       default:
          return blob( { std::vector<char>( (char*)&_data, (char*)&_data + sizeof(_data) ) } );
    }
@@ -558,7 +652,7 @@ const variants&       variant::get_array()const
 {
   if( get_type() == array_type )
      return **reinterpret_cast<const const_variants_ptr*>(this);
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Array", ("type",get_type()) );
+  throw std::bad_cast();
 }
 
 
@@ -567,7 +661,7 @@ variant_object&        variant::get_object()
 {
   if( get_type() == object_type )
      return **reinterpret_cast<variant_object**>(this);
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Object", ("type",get_type()) );
+  throw std::bad_cast();
 }
 
 const variant& variant::operator[]( const char* key )const
@@ -611,7 +705,7 @@ size_t variant::estimated_size()const
    case blob_type:
       return sizeof(blob) + get_blob().data.size() + sizeof(*this);
    default:
-      FCL_THROW_EXCEPTION( assert_exception, "Invalid Type / Corrupted Memory" );
+      throw std::runtime_error("Invalid Type / Corrupted Memory");
    }
 }
 
@@ -619,7 +713,7 @@ const std::string&        variant::get_string()const
 {
   if( get_type() == string_type )
      return **reinterpret_cast<const const_string_ptr*>(this);
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from type '${type}' to string", ("type",get_type()) );
+  throw std::bad_cast();
 }
 
 /// @throw if get_type() != object_type
@@ -627,7 +721,7 @@ const variant_object&  variant::get_object()const
 {
   if( get_type() == object_type )
      return **reinterpret_cast<const const_variant_object_ptr*>(this);
-  FCL_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from type '${type}' to Object", ("type",get_type()) );
+  throw std::bad_cast();
 }
 
 void from_variant( const variant& var,  variants& vo )
@@ -684,7 +778,7 @@ void from_variant( const variant& var,  unsigned __int128& vo )
    } else if( var.is_string() ) {
       vo = static_cast<unsigned __int128>( boost::multiprecision::uint128_t(var.as_string()) );
    } else {
-      FCL_THROW_EXCEPTION( bad_cast_exception, "Cannot convert variant of type '${type}' into a uint128_t", ("type", var.get_type()) );
+      throw std::bad_cast();
    }
 }
 
@@ -699,8 +793,18 @@ void from_variant( const variant& var,  __int128& vo )
    } else if( var.is_string() ) {
       vo = static_cast<__int128>( boost::multiprecision::int128_t(var.as_string()) );
    } else {
-      FCL_THROW_EXCEPTION( bad_cast_exception, "Cannot convert variant of type '${type}' into a int128_t", ("type", var.get_type()) );
+      throw std::bad_cast();
    }
+}
+
+void to_variant( const uint128& var, variant& vo )
+{
+   vo = std::string( var );
+}
+
+void from_variant( const variant& var, uint128& vo )
+{
+   vo = uint128( var.as_string() );
 }
 
 void from_variant( const variant& var,  int64_t& vo )
@@ -740,29 +844,33 @@ void from_variant( const variant& var,  std::string& vo )
 
 void to_variant( const std::vector<char>& var,  variant& vo )
 {
-   FCL_ASSERT( var.size() <= MAX_SIZE_OF_BYTE_ARRAYS );
+   if( var.size() > MAX_SIZE_OF_BYTE_ARRAYS )
+      throw std::out_of_range("byte array too large");
    if( var.size() )
-      vo = variant(to_hex(var.data(),var.size()));
+      vo = variant(variant_to_hex(var.data(),var.size()));
    else vo = "";
 }
 void from_variant( const variant& var,  std::vector<char>& vo )
 {
    const auto& str = var.get_string();
-   FCL_ASSERT( str.size() <= 2*MAX_SIZE_OF_BYTE_ARRAYS ); // Doubled because hex strings needs two characters per byte
-   FCL_ASSERT( str.size() % 2 == 0, "the length of hex string should be even number" );
+   if( str.size() > 2*MAX_SIZE_OF_BYTE_ARRAYS )
+      throw std::out_of_range("hex string too large");
+   if( str.size() % 2 != 0 )
+      throw std::invalid_argument("the length of hex string should be even number");
    vo.resize( str.size() / 2 );
    if( vo.size() ) {
-      size_t r = from_hex( str, vo.data(), vo.size() );
-      FCL_ASSERT( r == vo.size() );
+      size_t r = variant_from_hex( str, vo.data(), vo.size() );
+      if( r != vo.size() )
+         throw std::runtime_error("hex decode length mismatch");
    }
 }
 
 void to_variant( const blob& b, variant& v ) {
-   v = variant(base64_encode(b.data.data(), b.data.size()));
+   v = variant(variant_base64_encode(b.data.data(), b.data.size()));
 }
 
 void from_variant( const variant& v, blob& b ) {
-   b.data = base64_decode(v.as_string());
+   b.data = variant_base64_decode(v.as_string());
 }
 
 void to_variant( const UInt<8>& n, variant& v ) { v = uint64_t(n); }
@@ -780,113 +888,8 @@ void from_variant( const variant& v, UInt<32>& n ) { n = static_cast<uint32_t>(v
 void to_variant( const UInt<64>& n, variant& v ) { v = uint64_t(n); }
 void from_variant( const variant& v, UInt<64>& n ) { n = v.as_uint64(); }
 
-constexpr size_t minimize_max_size = 1024;
-
-// same behavior as std::string::substr only removes invalid utf8, and lower ascii
-void clean_append( std::string& app, const std::string_view& s, size_t pos = 0, size_t len = std::string::npos ) {
-   std::string_view sub = s.substr( pos, len );
-   app.reserve( app.size() + sub.size() );
-   const bool escape_control_chars = false;
-   app += escape_string( sub, nullptr, escape_control_chars );
-}
-
-std::string format_string( const std::string& frmt, const variant_object& args, bool minimize )
-{
-   std::string result;
-   const std::string& format = ( minimize && frmt.size() > minimize_max_size ) ?
-         frmt.substr( 0, minimize_max_size ) + "..." : frmt;
-
-   const auto arg_num = (args.size() == 0) ? 1 : args.size();
-   const auto max_format_size = std::max(minimize_max_size, format.size());
-   // limit each arg size when minimize is set
-   const auto minimize_sub_max_size = minimize ? ( max_format_size - format.size() ) / arg_num :  minimize_max_size;
-   // reserve space for each argument replaced by ...
-   result.reserve( max_format_size + 3 * args.size());
-   size_t prev = 0;
-   size_t next = format.find( '$' );
-   while( prev != std::string::npos && prev < format.size() ) {
-      if( next != std::string::npos ) {
-         clean_append( result, format, prev, next - prev );
-      } else {
-         clean_append( result, format, prev );
-      }
-
-      // if we got to the end, return it.
-      if( next == std::string::npos ) {
-         return result;
-      } else if( minimize && result.size() > minimize_max_size ) {
-         result += "...";
-         return result;
-      }
-
-      // if we are not at the end, then update the start
-      prev = next + 1;
-
-      if( format[prev] == '{' ) {
-         // if the next char is a open, then find close
-         next = format.find( '}', prev );
-         // if we found close...
-         if( next != std::string::npos ) {
-            // the key is between prev and next
-            std::string key = format.substr( prev + 1, (next - prev - 1) );
-
-            auto val = args.find( key );
-            bool replaced = true;
-            if( val != args.end() ) {
-               if( val->value().is_object() || val->value().is_array() ) {
-                  if( minimize && (result.size() >= minimize_max_size)) {
-                     replaced = false;
-                  } else {
-                     const auto max_length = minimize ? minimize_sub_max_size : std::numeric_limits<uint64_t>::max();
-                     try {
-                        // clean_append not needed as to_string is valid utf8
-                        result += json::to_string( val->value(), fcl::time_point::maximum(),
-                                                   json::output_formatting::stringify_large_ints_and_doubles, max_length );
-                     } catch (...) {
-                        replaced = false;
-                     }
-                  }
-               } else if( val->value().is_blob() ) {
-                  if( minimize && val->value().get_blob().data.size() > minimize_sub_max_size ) {
-                     replaced = false;
-                  } else {
-                     clean_append( result, val->value().as_string() );
-                  }
-               } else if( val->value().is_string() ) {
-                  if( minimize && val->value().get_string().size() > minimize_sub_max_size ) {
-                     auto sz = std::min( minimize_sub_max_size, minimize_max_size - result.size() );
-                     clean_append( result, val->value().get_string(), 0, sz );
-                     result += "...";
-                  } else {
-                     clean_append( result, val->value().get_string() );
-                  }
-               } else {
-                  clean_append( result, val->value().as_string() );
-               }
-            } else {
-               replaced = false;
-            }
-            if( !replaced ) {
-               result += "${";
-               clean_append( result, key );
-               result += "}";
-            }
-            prev = next + 1;
-            // find the next $
-            next = format.find( '$', prev );
-         } else {
-            // we didn't find it.. continue to while...
-         }
-      } else {
-         clean_append( result, format, prev, 1 );
-         ++prev;
-         next = format.find( '$', prev );
-      }
-   }
-   return result;
-}
-
    #ifdef __APPLE__
+   void to_variant( size_t s, variant& v ) { v = variant( uint64_t(s) ); }
    #elif !defined(_MSC_VER)
    void to_variant( long long int s, variant& v ) { v = variant( int64_t(s) ); }
    void to_variant( unsigned long long int s, variant& v ) { v = variant( uint64_t(s)); }
@@ -918,7 +921,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
       if( a.is_double()  || b.is_double() ) return a.as_double() < b.as_double();
       if( a.is_int64()   || b.is_int64() )  return a.as_int64() < b.as_int64();
       if( a.is_uint64()  || b.is_uint64() ) return a.as_uint64() < b.as_uint64();
-      FCL_ASSERT( false, "Invalid operation" );
+      throw std::runtime_error("Invalid operation");
    }
 
    bool operator > ( const variant& a, const variant& b )
@@ -927,7 +930,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
       if( a.is_double()  || b.is_double() ) return a.as_double() > b.as_double();
       if( a.is_int64()   || b.is_int64() )  return a.as_int64() > b.as_int64();
       if( a.is_uint64()  || b.is_uint64() ) return a.as_uint64() > b.as_uint64();
-      FCL_ASSERT( false, "Invalid operation" );
+      throw std::runtime_error("Invalid operation");
    }
 
    bool operator <= ( const variant& a, const variant& b )
@@ -936,7 +939,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
       if( a.is_double()  || b.is_double() ) return a.as_double() <= b.as_double();
       if( a.is_int64()   || b.is_int64() )  return a.as_int64() <= b.as_int64();
       if( a.is_uint64()  || b.is_uint64() ) return a.as_uint64() <= b.as_uint64();
-      FCL_ASSERT( false, "Invalid operation" );
+      throw std::runtime_error("Invalid operation");
    }
 
 
@@ -964,7 +967,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
       if( a.is_double()  || b.is_double() ) return a.as_double() + b.as_double();
       if( a.is_int64()   || b.is_int64() )  return a.as_int64() + b.as_int64();
       if( a.is_uint64()  || b.is_uint64() ) return a.as_uint64() + b.as_uint64();
-      FCL_ASSERT( false, "invalid operation ${a} + ${b}", ("a",a)("b",b) );
+      throw std::runtime_error("invalid variant addition");
    }
 
    variant operator - ( const variant& a, const variant& b )
@@ -991,7 +994,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
       if( a.is_double()  || b.is_double() ) return a.as_double() - b.as_double();
       if( a.is_int64()   || b.is_int64() )  return a.as_int64() - b.as_int64();
       if( a.is_uint64()  || b.is_uint64() ) return a.as_uint64() - b.as_uint64();
-      FCL_ASSERT( false, "invalid operation ${a} + ${b}", ("a",a)("b",b) );
+      throw std::runtime_error("invalid variant subtraction");
    }
    variant operator * ( const variant& a, const variant& b )
    {
@@ -1016,7 +1019,7 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
          }
          return result;
       }
-      FCL_ASSERT( false, "invalid operation ${a} * ${b}", ("a",a)("b",b) );
+      throw std::runtime_error("invalid variant multiplication");
    }
    variant operator / ( const variant& a, const variant& b )
    {
@@ -1041,6 +1044,6 @@ std::string format_string( const std::string& frmt, const variant_object& args, 
          }
          return result;
       }
-      FCL_ASSERT( false, "invalid operation ${a} / ${b}", ("a",a)("b",b) );
+      throw std::runtime_error("invalid variant division");
    }
 } // namespace fcl

@@ -1,10 +1,17 @@
-#include "fcl/core/utf8.hpp"
+module;
+#include <checked.h>
+#include <core.h>
 
-#include "utf8/checked.h"
-#include "utf8/core.h"
+#include <cassert>
+#include <cstdint>
+#include <iterator>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
-#include <fcl/log/logger.hpp>
-#include <fcl/exception/exception.hpp>
+module fcl.core.utf8;
 
 namespace fcl {
 
@@ -22,7 +29,7 @@ namespace fcl {
    std::pair<octet_iterator, uint32_t> find_invalid(octet_iterator start, octet_iterator end,
                                                 const std::pair<uint32_t, uint32_t>& invalid_range)
    {
-      FCL_ASSERT( invalid_range.first <= invalid_range.second );
+      assert( invalid_range.first <= invalid_range.second );
       octet_iterator result = start;
       uint32_t value = UINT32_MAX;
       while( result != end ) {
@@ -70,14 +77,18 @@ namespace fcl {
 
    void decodeUtf8(const std::string& input, std::wstring* storage)
    {
-     FCL_ASSERT(storage != nullptr);
+     if( storage == nullptr ) {
+       throw std::invalid_argument( "decodeUtf8 storage must not be null" );
+     }
 
      utf8::utf8to32(input.begin(), input.end(), std::back_inserter(*storage));
    }
 
    void encodeUtf8(const std::wstring& input, std::string* storage)
    {
-     FCL_ASSERT(storage != nullptr);
+     if( storage == nullptr ) {
+       throw std::invalid_argument( "encodeUtf8 storage must not be null" );
+     }
 
      utf8::utf32to8(input.begin(), input.end(), std::back_inserter(*storage));
    }

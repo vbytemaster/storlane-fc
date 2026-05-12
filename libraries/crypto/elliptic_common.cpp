@@ -1,9 +1,11 @@
-#include <fcl/crypto/elliptic.hpp>
-#include <fcl/raw/raw.hpp>
-#include <fcl/crypto/hmac.hpp>
-#include <fcl/crypto/openssl.hpp>
-#include <fcl/crypto/ripemd160.hpp>
-
+module;
+#include <array>
+#include <cstring>
+#include <exception>
+#include <openssl/bn.h>
+#include <openssl/ec.h>
+#include <openssl/obj_mac.h>
+#include <stdexcept>
 #ifdef _WIN32
 # include <malloc.h>
 #elif defined(__FreeBSD__)
@@ -12,15 +14,31 @@
 # include <alloca.h>
 #endif
 
+module fcl.crypto.elliptic;
+
+import fcl.crypto.hmac;
+import fcl.crypto.openssl;
+import fcl.crypto.ripemd160;
+import fcl.crypto.sha256;
+import fcl.crypto.sha512;
+import fcl.raw.raw;
+
 /* stuff common to all ecc implementations */
 
 #define BTC_EXT_PUB_MAGIC   (0x0488B21E)
 #define BTC_EXT_PRIV_MAGIC  (0x0488ADE4)
 
-namespace fcl { namespace ecc {
+namespace fcl::ecc {
 
     namespace detail {
-        typedef fcl::array<char,37> chr37;
+        void require(bool value, const char* message)
+        {
+            if (!value) {
+                throw std::logic_error(message);
+            }
+        }
+
+        typedef std::array<char,37> chr37;
 
         fcl::sha256 _left( const fcl::sha512& v )
         {
@@ -72,10 +90,10 @@ namespace fcl { namespace ecc {
             const ec_group& group = get_curve();
             bn_ctx ctx(BN_CTX_new());
             ssl_bignum order;
-            FCL_ASSERT( EC_GROUP_get_order( group, order, ctx ) );
+            require(EC_GROUP_get_order(group, order, ctx), "failed to read curve order");
             private_key_secret bin;
-            FCL_ASSERT( BN_num_bytes( order ) == bin.data_size() );
-            FCL_ASSERT( BN_bn2bin( order, (unsigned char*) bin.data() ) == bin.data_size() );
+            require(BN_num_bytes(order) == bin.data_size(), "unexpected curve order size");
+            require(BN_bn2bin(order, (unsigned char*) bin.data()) == bin.data_size(), "failed to serialize curve order");
             return bin;
         }
 
@@ -90,11 +108,11 @@ namespace fcl { namespace ecc {
             const ec_group& group = get_curve();
             bn_ctx ctx(BN_CTX_new());
             ssl_bignum order;
-            FCL_ASSERT( EC_GROUP_get_order( group, order, ctx ) );
+            require(EC_GROUP_get_order(group, order, ctx), "failed to read curve order");
             BN_rshift1( order, order );
             private_key_secret bin;
-            FCL_ASSERT( BN_num_bytes( order ) == bin.data_size() );
-            FCL_ASSERT( BN_bn2bin( order, (unsigned char*) bin.data() ) == bin.data_size() );
+            require(BN_num_bytes(order) == bin.data_size(), "unexpected half curve order size");
+            require(BN_bn2bin(order, (unsigned char*) bin.data()) == bin.data_size(), "failed to serialize half curve order");
             return bin;
         }
 
@@ -118,10 +136,10 @@ namespace fcl { namespace ecc {
     }
 
     bool public_key::is_canonical( const compact_signature& c ) {
-        return !(c.data[1] & 0x80)
-               && !(c.data[1] == 0 && !(c.data[2] & 0x80))
-               && !(c.data[33] & 0x80)
-               && !(c.data[33] == 0 && !(c.data[34] & 0x80));
+        return !(c.data()[1] & 0x80)
+               && !(c.data()[1] == 0 && !(c.data()[2] & 0x80))
+               && !(c.data()[33] & 0x80)
+               && !(c.data()[33] == 0 && !(c.data()[34] & 0x80));
     }
 
     private_key private_key::generate_from_seed( const fcl::sha256& seed, const fcl::sha256& offset )
@@ -141,12 +159,10 @@ namespace fcl { namespace ecc {
         BN_mod(secexp, secexp, order, ctx);
 
         fcl::sha256 secret;
-        FCL_ASSERT(BN_num_bytes(secexp) <= int64_t(sizeof(secret)));
+        detail::require(BN_num_bytes(secexp) <= int64_t(sizeof(secret)), "secret exponent is too large");
         auto shift = sizeof(secret) - BN_num_bytes(secexp);
         BN_bn2bin(secexp, ((unsigned char*)&secret)+shift);
         return regenerate( secret );
     }
 
-}
-
-}
+} // namespace fcl::ecc

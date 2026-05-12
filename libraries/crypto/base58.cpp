@@ -1,3 +1,5 @@
+module;
+#include <fcl/exception/macros.hpp>
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -20,14 +22,15 @@
 #include <limits>
 #include <algorithm>
 
-#include <fcl/crypto/base58.hpp>
-#include <fcl/log/logger.hpp>
-#include <fcl/core/string.hpp>
-#include <fcl/exception/exception.hpp>
-
 #include <stdexcept>
 #include <vector>
 #include <openssl/bn.h>
+
+module fcl.crypto.base58;
+
+import fcl.core.string;
+import fcl.core.utility;
+import fcl.exception.exception;
 
 /** Errors thrown by the bignum class */
 class bignum_error : public std::runtime_error
@@ -628,7 +631,7 @@ std::string to_base58( const std::vector<char>& d, const fcl::yield_function_t& 
 std::vector<char> from_base58( const std::string& base58_str ) {
    std::vector<unsigned char> out;
    if( !DecodeBase58( base58_str.c_str(), out ) ) {
-     FCL_THROW_EXCEPTION( parse_error_exception, "Unable to decode base58 string ${base58_str}", ("base58_str",base58_str) );
+     FCL_THROW("Unable to decode base58 string ${base58_str}", fcl::error::ctx("base58_str", base58_str));
    }
    return std::vector<char>((const char*)out.data(), ((const char*)out.data())+out.size() );
 }
@@ -639,7 +642,7 @@ size_t from_base58( const std::string& base58_str, char* out_data, size_t out_da
   //slog( "%s", base58_str.c_str() );
   std::vector<unsigned char> out;
   if( !DecodeBase58( base58_str.c_str(), out ) ) {
-    FCL_THROW_EXCEPTION( parse_error_exception, "Unable to decode base58 string ${base58_str}", ("base58_str",base58_str) );
+    FCL_THROW("Unable to decode base58 string ${base58_str}", fcl::error::ctx("base58_str", base58_str));
   }
   FCL_ASSERT( out.size() <= out_data_len );
   memcpy( out_data, out.data(), out.size() );

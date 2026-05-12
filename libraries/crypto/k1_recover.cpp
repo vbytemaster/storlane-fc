@@ -1,7 +1,10 @@
-#include <fcl/exception/exception.hpp>
-#include <fcl/crypto/k1_recover.hpp>
+module;
+#include <variant>
+#include <vector>
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
+
+module fcl.crypto.k1_recover;
 
 namespace fcl {
 
@@ -12,7 +15,9 @@ namespace fcl {
 
     std::variant<k1_recover_error, bytes> k1_recover(const bytes& signature, const bytes& digest) {
         const secp256k1_context* context{k1_recover_context()};
-        FCL_ASSERT(context != nullptr);
+        if (context == nullptr) {
+            return k1_recover_error::init_error;
+        }
 
         if (signature.size() != 65 || digest.size() != 32) {
             return k1_recover_error::input_error;

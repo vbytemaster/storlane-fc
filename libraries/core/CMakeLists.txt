@@ -7,31 +7,27 @@ configure_file(
 
 add_library(
    fcl_core OBJECT
-   filesystem.cpp
-   mock_time.cpp
+   chrono.cpp
    string.cpp
-   time.cpp
    uint128.cpp
    utf8.cpp
    "${CMAKE_CURRENT_BINARY_DIR}/generated/git_revision.cpp"
 )
+fcl_target_modules(fcl_core core)
 
-target_include_directories(fcl_core PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS})
-target_link_libraries(fcl_core PUBLIC Boost::headers)
+target_include_directories(
+   fcl_core
+   PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS}
+   PRIVATE "${PROJECT_SOURCE_DIR}/vendor/utf8cpp"
+)
+target_link_libraries(
+   fcl_core PRIVATE
+      Boost::headers
+      Boost::date_time
+      Boost::multiprecision
+)
 target_compile_definitions(
    fcl_core
    PUBLIC OPENSSL_API_COMPAT=0x30000000L
           OPENSSL_NO_DEPRECATED
 )
-
-if(FCL_ENABLE_MODULES AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-   target_sources(
-      fcl_core
-      PUBLIC
-         FILE_SET CXX_MODULES
-         BASE_DIRS include
-         FILES include/fcl/core/version.cppm
-   )
-elseif(FCL_ENABLE_MODULES)
-   message(STATUS "FCL module file sets requested, but AppleClang cannot provide CMake's module dependency scan; building textual headers only")
-endif()

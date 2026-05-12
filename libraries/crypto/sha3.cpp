@@ -1,14 +1,22 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/crypto/hmac.hpp>
-#include <fcl/core/fwd_impl.hpp>
-#include <openssl/sha.h>
-#include <string.h>
+module;
+#include <fcl/exception/macros.hpp>
 #include <cmath>
-#include <fcl/crypto/sha3.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/exception/exception.hpp>
-#include "_digest_common.hpp"
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <openssl/sha.h>
+#include <string>
+#include <variant>
 
+module fcl.crypto.sha3;
+
+import fcl.core.utility;
+import fcl.crypto.hex;
+import fcl.crypto.hmac;
+import fcl.exception.exception;
+import fcl.variant;
+
+#include "_digest_common.hpp"
 namespace fcl
 {
 
@@ -188,7 +196,7 @@ sha3::sha3()
 sha3::sha3(const char *data, size_t size)
 {
 	if (size != sizeof(_hash))
-		FCL_THROW_EXCEPTION(exception, "sha3: size mismatch");
+		FCL_THROW("sha3: size mismatch");
 	memcpy(_hash, data, size);
 }
 sha3::sha3(const std::string &hex_str)
@@ -214,6 +222,7 @@ struct sha3::encoder::impl
 
 sha3::encoder::~encoder() {}
 sha3::encoder::encoder()
+: my( std::make_unique<impl>() )
 {
 	reset();
 }

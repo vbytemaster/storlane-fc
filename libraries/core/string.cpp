@@ -1,14 +1,18 @@
-#include <fcl/core/string.hpp>
-#include <fcl/core/utf8.hpp>
-#include <fcl/json/json.hpp>
-#include <fcl/exception/exception.hpp>
+module;
 #include <boost/lexical_cast.hpp>
 
+#include <algorithm>
+#include <cstdio>
+#include <functional>
 #include <string>
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <stdexcept>
 
+module fcl.core.string;
+
+import fcl.core.utf8;
 /**
  *  Implemented with std::string for now.
  */
@@ -29,23 +33,21 @@ namespace fcl  {
     }
     catch( const boost::bad_lexical_cast& e )
     {
-      FCL_THROW_EXCEPTION( parse_error_exception, "Couldn't parse int64_t" );
+      throw std::invalid_argument( "could not parse int64_t: " + i );
     }
-    FCL_RETHROW_EXCEPTIONS( warn, "${i} => int64_t", ("i",i) )
   }
 
   uint64_t   to_uint64( const std::string& i )
-  { try {
+  {
     try
     {
       return boost::lexical_cast<uint64_t>(i.c_str(), i.size());
     }
     catch( const boost::bad_lexical_cast& e )
     {
-      FCL_THROW_EXCEPTION( parse_error_exception, "Couldn't parse uint64_t" );
+      throw std::invalid_argument( "could not parse uint64_t: " + i );
     }
-    FCL_RETHROW_EXCEPTIONS( warn, "${i} => uint64_t", ("i",i) )
-  } FCL_CAPTURE_AND_RETHROW( (i) ) }
+  }
 
   double     to_double( const std::string& i)
   {
@@ -55,10 +57,40 @@ namespace fcl  {
     }
     catch( const boost::bad_lexical_cast& e )
     {
-      FCL_THROW_EXCEPTION( parse_error_exception, "Couldn't parse double" );
+      throw std::invalid_argument( "could not parse double: " + i );
     }
-    FCL_RETHROW_EXCEPTIONS( warn, "${i} => double", ("i",i) )
   }
+
+  static void append_json_escaped_char( std::string& out, unsigned char c, bool escape_ctrl )
+  {
+     switch( c ) {
+        case '\\': out += escape_ctrl ? "\\\\" : "\\"; return;
+        case '"':  out += escape_ctrl ? "\\\"" : "\""; return;
+        case '\t': out += escape_ctrl ? "\\t" : "\t"; return;
+        case '\r': out += escape_ctrl ? "\\r" : "\r"; return;
+        case '\n': out += escape_ctrl ? "\\n" : "\n"; return;
+        default:
+           if( c == 0x7f || c < 0x20 ) {
+              char buf[7] = {};
+              std::snprintf( buf, sizeof( buf ), "\\u%04x", static_cast<unsigned>( c ) );
+              out += buf;
+           } else {
+              out.push_back( static_cast<char>( c ) );
+           }
+     }
+  }
+
+  static std::string escape_for_string_boundary( const std::string_view str, bool escape_ctrl )
+  {
+     const auto pruned = fcl::prune_invalid_utf8( str );
+     std::string out;
+     out.reserve( pruned.size() );
+     for( unsigned char c : pruned ) {
+        append_json_escaped_char( out, c, escape_ctrl );
+     }
+     return out;
+  }
+
   std::pair<std::string&, bool> escape_str( std::string& str, escape_control_chars escape_ctrl,
                                             std::size_t max_len, std::string_view add_truncate_str )
   {
@@ -77,7 +109,7 @@ namespace fcl  {
               return c == '\x7f' || (c >= '\x00' && c <= '\x08') || c == '\x0b' || c == '\x0c' || (c >= '\x0e' && c <= '\x1f'); } );
 
      if (itr != str.end() || !fcl::is_valid_utf8( str )) {
-        str = escape_string(str, nullptr, escape_ctrl == escape_control_chars::on);
+        str = escape_for_string_boundary(str, escape_ctrl == escape_control_chars::on);
         modified = true;
         if (str.size() > max_len) {
            str.resize(max_len);
@@ -94,5 +126,3 @@ namespace fcl  {
 
 
 } // namespace fcl
-
-

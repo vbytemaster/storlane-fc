@@ -1,23 +1,31 @@
-#include <fcl/crypto/elliptic_r1.hpp>
-
-#include <fcl/crypto/openssl.hpp>
-#include <fcl/crypto/rand.hpp>
-
-#include <fcl/core/fwd_impl.hpp>
-#include <fcl/exception/exception.hpp>
-
+module;
+#include <fcl/exception/macros.hpp>
 #include <openssl/core_names.h>
+#include <openssl/bn.h>
+#include <openssl/ec.h>
+#include <openssl/ecdsa.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/obj_mac.h>
 #include <openssl/param_build.h>
 #include <openssl/params.h>
 
 #include <array>
 #include <cstring>
+#include <exception>
+#include <memory>
 #include <optional>
 #include <vector>
 
-namespace fcl { namespace crypto { namespace r1 {
+module fcl.crypto.elliptic_r1;
+
+import fcl.crypto.openssl;
+import fcl.crypto.rand;
+import fcl.crypto.sha256;
+import fcl.crypto.sha512;
+import fcl.exception.exception;
+
+namespace fcl::crypto::r1 {
     namespace detail
     {
       class public_key_impl
@@ -36,8 +44,8 @@ namespace fcl { namespace crypto { namespace r1 {
     namespace {
       constexpr const char* r1_group_name = "prime256v1";
 
-      const public_key_data empty_public_key;
-      const private_key_secret empty_private_key;
+      const public_key_data empty_public_key{};
+      const private_key_secret empty_private_key{};
 
       struct evp_pkey_deleter {
         void operator()(EVP_PKEY* p) const noexcept { EVP_PKEY_free(p); }
@@ -68,7 +76,9 @@ namespace fcl { namespace crypto { namespace r1 {
 
       void throw_openssl_error(const char* message)
       {
-        FCL_THROW_EXCEPTION(exception, "${message}", ("message", message)("code", static_cast<uint32_t>(ERR_get_error())));
+        FCL_THROW("OpenSSL error",
+                  fcl::error::ctx("message", message),
+                  fcl::error::ctx("code", static_cast<uint32_t>(ERR_get_error())));
       }
 
       bool is_empty(const public_key_data& key)
@@ -107,10 +117,12 @@ namespace fcl { namespace crypto { namespace r1 {
         bn_ctx ctx(BN_CTX_new());
         public_key_data result;
         const auto written = EC_POINT_point2oct(group, point, POINT_CONVERSION_COMPRESSED,
-                                                reinterpret_cast<unsigned char*>(result.data),
+                                                reinterpret_cast<unsigned char*>(result.data()),
                                                 result.size(), ctx);
-        FCL_ASSERT(written == result.size(), "unexpected R1 public key size",
-                  ("written", written)("expected", result.size()));
+        FCL_ASSERT(written == result.size(),
+                   "unexpected R1 public key size",
+                   fcl::error::ctx("written", written),
+                   fcl::error::ctx("expected", result.size()));
         return result;
       }
 
@@ -119,13 +131,15 @@ namespace fcl { namespace crypto { namespace r1 {
         const ec_group& group = get_curve();
         bn_ctx ctx(BN_CTX_new());
         ec_point point(EC_POINT_new(group));
-        FCL_ASSERT(EC_POINT_oct2point(group, point, reinterpret_cast<const unsigned char*>(data.data), data.size(), ctx));
+        FCL_ASSERT(EC_POINT_oct2point(group, point, reinterpret_cast<const unsigned char*>(data.data()), data.size(), ctx));
         public_key_point_data result;
         const auto written = EC_POINT_point2oct(group, point, POINT_CONVERSION_UNCOMPRESSED,
-                                                reinterpret_cast<unsigned char*>(result.data),
+                                                reinterpret_cast<unsigned char*>(result.data()),
                                                 result.size(), ctx);
-        FCL_ASSERT(written == result.size(), "unexpected uncompressed R1 public key size",
-                  ("written", written)("expected", result.size()));
+        FCL_ASSERT(written == result.size(),
+                   "unexpected uncompressed R1 public key size",
+                   fcl::error::ctx("written", written),
+                   fcl::error::ctx("expected", result.size()));
         return result;
       }
 
@@ -156,7 +170,7 @@ namespace fcl { namespace crypto { namespace r1 {
         std::strncpy(group_name.data(), r1_group_name, group_name.size() - 1);
         OSSL_PARAM params[] = {
           OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, group_name.data(), 0),
-          OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub_uncompressed.data, pub_uncompressed.size()),
+          OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub_uncompressed.data(), pub_uncompressed.size()),
           OSSL_PARAM_construct_end()
         };
         evp_pkey_ctx_ptr ctx(EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr));
@@ -179,7 +193,7 @@ namespace fcl { namespace crypto { namespace r1 {
                                                        r1_group_name, 0));
         FCL_ASSERT(1 == OSSL_PARAM_BLD_push_BN(builder.get(), OSSL_PKEY_PARAM_PRIV_KEY, priv));
         FCL_ASSERT(1 == OSSL_PARAM_BLD_push_octet_string(builder.get(), OSSL_PKEY_PARAM_PUB_KEY,
-                                                        pub_uncompressed.data, pub_uncompressed.size()));
+                                                        pub_uncompressed.data(), pub_uncompressed.size()));
         ossl_param_ptr params(OSSL_PARAM_BLD_to_param(builder.get()));
         FCL_ASSERT(params != nullptr, "error building EVP private key params");
         evp_pkey_ctx_ptr ctx(EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr));
@@ -220,7 +234,7 @@ namespace fcl { namespace crypto { namespace r1 {
 
       size_t der_signature_size(const signature& sig)
       {
-        const auto* bytes = reinterpret_cast<const unsigned char*>(sig.data);
+        const auto* bytes = reinterpret_cast<const unsigned char*>(sig.data());
         if(sig.size() < 2 || bytes[0] != 0x30)
           return 0;
         if((bytes[1] & 0x80) == 0)
@@ -313,28 +327,28 @@ namespace fcl { namespace crypto { namespace r1 {
 
     public_key_data recover_public_key_data(const compact_signature& c, const fcl::sha256& digest, bool check_canonical)
     {
-      int nV = c.data[0];
+      int nV = c.data()[0];
       if(nV < 27 || nV >= 35)
-        FCL_THROW_EXCEPTION(exception, "unable to reconstruct public key from signature");
+        FCL_THROW("unable to reconstruct public key from signature");
       ecdsa_sig sig(ECDSA_SIG_new());
       BIGNUM* r = BN_new();
       BIGNUM* s = BN_new();
       FCL_ASSERT(r != nullptr && s != nullptr, "error allocating R1 signature bignums");
-      BN_bin2bn(&c.data[1], 32, r);
-      BN_bin2bn(&c.data[33], 32, s);
+      BN_bin2bn(&c.data()[1], 32, r);
+      BN_bin2bn(&c.data()[33], 32, s);
       const ec_group& group = get_curve();
       bn_ctx ctx(BN_CTX_new());
       ssl_bignum order, halforder;
       FCL_ASSERT(EC_GROUP_get_order(group, order, ctx));
       BN_rshift1(halforder, order);
       if(check_canonical && BN_cmp(s, halforder) > 0)
-        FCL_THROW_EXCEPTION(exception, "invalid high s-value encountered in r1 signature");
+        FCL_THROW("invalid high s-value encountered in r1 signature");
       ECDSA_SIG_set0(sig, r, s);
       if(nV >= 31)
         nV -= 4;
       auto recovered = recover_public_key_from_sig(sig, digest, nV - 27, false);
       if(!recovered)
-        FCL_THROW_EXCEPTION(exception, "unable to reconstruct public key from signature");
+        FCL_THROW("unable to reconstruct public key from signature");
       return *recovered;
     }
 
@@ -355,11 +369,11 @@ namespace fcl { namespace crypto { namespace r1 {
         BN_sub(s, order, s);
 
       compact_signature csig;
-      std::memset(csig.data, 0, csig.size());
+      std::memset(csig.data(), 0, csig.size());
       const int nBitsR = BN_num_bits(r);
       const int nBitsS = BN_num_bits(s);
       if(nBitsR > 256 || nBitsS > 256)
-        FCL_THROW_EXCEPTION(exception, "Unable to sign");
+        FCL_THROW("Unable to sign");
 
       ECDSA_SIG_set0(sig, r, s);
 
@@ -372,11 +386,11 @@ namespace fcl { namespace crypto { namespace r1 {
         }
       }
       if(nRecId == -1)
-        FCL_THROW_EXCEPTION(exception, "unable to construct recoverable key");
+        FCL_THROW("unable to construct recoverable key");
 
-      csig.data[0] = nRecId + 27 + 4;
-      BN_bn2bin(r, &csig.data[33 - (nBitsR + 7) / 8]);
-      BN_bn2bin(s, &csig.data[65 - (nBitsS + 7) / 8]);
+      csig.data()[0] = nRecId + 27 + 4;
+      BN_bn2bin(r, &csig.data()[33 - (nBitsR + 7) / 8]);
+      BN_bn2bin(s, &csig.data()[65 - (nBitsS + 7) / 8]);
       return csig;
     }
 
@@ -385,7 +399,7 @@ namespace fcl { namespace crypto { namespace r1 {
       const ec_group& group = get_curve();
       bn_ctx ctx(BN_CTX_new());
       ec_point master(EC_POINT_new(group));
-      FCL_ASSERT(EC_POINT_oct2point(group, master, reinterpret_cast<const unsigned char*>(my->_key.data), my->_key.size(), ctx));
+      FCL_ASSERT(EC_POINT_oct2point(group, master, reinterpret_cast<const unsigned char*>(my->_key.data()), my->_key.size(), ctx));
       ssl_bignum z = bignum_from_bytes(digest.data(), digest.data_size());
       ec_point result(EC_POINT_new(group));
       FCL_ASSERT(EC_POINT_mul(group, result, nullptr, master, z, ctx));
@@ -406,22 +420,25 @@ namespace fcl { namespace crypto { namespace r1 {
         ssl_bignum order;
         EC_GROUP_get_order(group, order, ctx);
         if(BN_cmp(digest_bn, order) > 0)
-          FCL_THROW_EXCEPTION(exception, "digest > group order");
+          FCL_THROW("digest > group order");
 
         ec_point master(EC_POINT_new(group));
-        FCL_ASSERT(EC_POINT_oct2point(group, master, reinterpret_cast<const unsigned char*>(my->_key.data), my->_key.size(), ctx));
+        FCL_ASSERT(EC_POINT_oct2point(group, master, reinterpret_cast<const unsigned char*>(my->_key.data()), my->_key.size(), ctx));
         auto digest_key = private_key::regenerate(digest).get_public_key().serialize();
         ec_point digest_point(EC_POINT_new(group));
-        FCL_ASSERT(EC_POINT_oct2point(group, digest_point, reinterpret_cast<const unsigned char*>(digest_key.data), digest_key.size(), ctx));
+        FCL_ASSERT(EC_POINT_oct2point(group, digest_point, reinterpret_cast<const unsigned char*>(digest_key.data()), digest_key.size(), ctx));
         ec_point result(EC_POINT_new(group));
         FCL_ASSERT(EC_POINT_add(group, result, digest_point, master, ctx));
         if(EC_POINT_is_at_infinity(group, result))
-          FCL_THROW_EXCEPTION(exception, "point at  infinity");
+          FCL_THROW("point at  infinity");
         return public_key(point_to_public_key_data(result));
-      } FCL_RETHROW_EXCEPTIONS(debug, "digest: ${digest}", ("digest",digest));
+      } FCL_CAPTURE_AND_RETHROW("digest: ${digest}", fcl::error::ctx("digest", digest));
     }
 
-    private_key::private_key() {}
+    private_key::private_key()
+      : my(std::make_unique<detail::private_key_impl>())
+    {
+    }
 
     private_key private_key::generate_from_seed(const fcl::sha256& seed, const fcl::sha256& offset)
     {
@@ -466,10 +483,12 @@ namespace fcl { namespace crypto { namespace r1 {
     {
       const auto der = sign_der(my->_key, digest);
       signature sig;
-      std::memset(sig.data, 0, sig.size());
-      FCL_ASSERT(der.size() <= sig.size(), "R1 DER signature is too large",
-                ("der_size", der.size())("signature_size", sig.size()));
-      std::memcpy(sig.data, der.data(), der.size());
+      std::memset(sig.data(), 0, sig.size());
+      FCL_ASSERT(der.size() <= sig.size(),
+                 "R1 DER signature is too large",
+                 fcl::error::ctx("der_size", der.size()),
+                 fcl::error::ctx("signature_size", sig.size()));
+      std::memcpy(sig.data(), der.data(), der.size());
       return sig;
     }
 
@@ -485,7 +504,7 @@ namespace fcl { namespace crypto { namespace r1 {
       if(!ctx || 1 != EVP_PKEY_verify_init(ctx.get()))
         throw_openssl_error("error initializing EVP R1 verifier");
       return 1 == EVP_PKEY_verify(ctx.get(),
-                                  reinterpret_cast<const unsigned char*>(sig.data), der_size,
+                                  reinterpret_cast<const unsigned char*>(sig.data()), der_size,
                                   reinterpret_cast<const unsigned char*>(digest.data()), digest.data_size());
     }
 
@@ -494,19 +513,24 @@ namespace fcl { namespace crypto { namespace r1 {
       return my->_key;
     }
 
-    public_key::public_key() {}
+    public_key::public_key()
+      : my(std::make_unique<detail::public_key_impl>())
+    {
+    }
     public_key::~public_key() {}
 
     public_key::public_key(const public_key_point_data& dat)
+      : my(std::make_unique<detail::public_key_impl>())
     {
-      if(dat.data[0] != 0)
-        my->_key = normalize_public_key_data(dat.data, dat.size());
+      if(dat.data()[0] != 0)
+        my->_key = normalize_public_key_data(dat.data(), dat.size());
     }
 
     public_key::public_key(const public_key_data& dat)
+      : my(std::make_unique<detail::public_key_impl>())
     {
-      if(dat.data[0] != 0)
-        my->_key = normalize_public_key_data(dat.data, dat.size());
+      if(dat.data()[0] != 0)
+        my->_key = normalize_public_key_data(dat.data(), dat.size());
     }
 
     bool private_key::verify(const fcl::sha256& digest, const fcl::crypto::r1::signature& sig)
@@ -527,7 +551,7 @@ namespace fcl { namespace crypto { namespace r1 {
       bn_ctx ctx(BN_CTX_new());
       ssl_bignum priv = bignum_from_bytes(my->_key.data(), my->_key.data_size());
       ec_point peer(EC_POINT_new(group));
-      FCL_ASSERT(EC_POINT_oct2point(group, peer, reinterpret_cast<const unsigned char*>(other.my->_key.data), other.my->_key.size(), ctx));
+      FCL_ASSERT(EC_POINT_oct2point(group, peer, reinterpret_cast<const unsigned char*>(other.my->_key.data()), other.my->_key.size(), ctx));
       ec_point shared(EC_POINT_new(group));
       FCL_ASSERT(EC_POINT_mul(group, shared, nullptr, peer, priv, ctx));
       ssl_bignum x;
@@ -542,6 +566,7 @@ namespace fcl { namespace crypto { namespace r1 {
     private_key::~private_key() {}
 
     public_key::public_key(const compact_signature& c, const fcl::sha256& digest, bool check_canonical)
+      : my(std::make_unique<detail::public_key_impl>())
     {
       my->_key = recover_public_key_data(c, digest, check_canonical);
     }
@@ -554,7 +579,7 @@ namespace fcl { namespace crypto { namespace r1 {
         auto der = sign_der(my->_key, digest);
         auto sig = parse_der_signature(der);
         return signature_from_ecdsa(my_pub_key, sig, digest);
-      } FCL_RETHROW_EXCEPTIONS(warn, "failed to sign ${digest}", ("digest", digest));
+      } FCL_CAPTURE_AND_RETHROW("failed to sign ${digest}", fcl::error::ctx("digest", digest));
     }
 
     private_key& private_key::operator=(private_key&& pk)
@@ -564,7 +589,7 @@ namespace fcl { namespace crypto { namespace r1 {
     }
 
     public_key::public_key(const public_key& pk)
-      :my(pk.my)
+      :my(pk.my ? std::make_unique<detail::public_key_impl>(*pk.my) : nullptr)
     {
     }
 
@@ -574,7 +599,7 @@ namespace fcl { namespace crypto { namespace r1 {
     }
 
     private_key::private_key(const private_key& pk)
-      :my(pk.my)
+      :my(pk.my ? std::make_unique<detail::private_key_impl>(*pk.my) : nullptr)
     {
     }
 
@@ -591,17 +616,14 @@ namespace fcl { namespace crypto { namespace r1 {
 
     public_key& public_key::operator=(const public_key& pk)
     {
-      my = pk.my;
+      my = pk.my ? std::make_unique<detail::public_key_impl>(*pk.my) : nullptr;
       return *this;
     }
 
     private_key& private_key::operator=(const private_key& pk)
     {
-      my = pk.my;
+      my = pk.my ? std::make_unique<detail::private_key_impl>(*pk.my) : nullptr;
       return *this;
     }
 
-}
-}
-
-}
+} // namespace fcl::crypto::r1

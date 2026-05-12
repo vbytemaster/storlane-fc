@@ -1,5 +1,13 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/exception/exception.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstdint>
+#include <exception>
+#include <string>
+#include <vector>
+
+module fcl.crypto.hex;
+
+import fcl.exception.exception;
 
 namespace fcl {
 
@@ -10,7 +18,7 @@ namespace fcl {
           return c - 'a' + 10;
       if( c >= 'A' && c <= 'F' )
           return c - 'A' + 10;
-      FCL_THROW_EXCEPTION( exception, "Invalid hex character '${c}'", ("c", std::string(&c,1) ) );
+      FCL_THROW("Invalid hex character '${c}'", fcl::error::ctx("c", std::string(&c,1) ));
       return 0;
     }
 

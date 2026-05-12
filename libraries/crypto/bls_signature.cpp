@@ -1,7 +1,19 @@
-#include <fcl/crypto/bls_signature.hpp>
-#include <fcl/crypto/common.hpp>
-#include <fcl/exception/exception.hpp>
-#include <fcl/crypto/bls_common.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <algorithm>
+#include <array>
+#include <bls12-381/bls12-381.hpp>
+#include <cstdint>
+#include <exception>
+#include <ranges>
+#include <span>
+#include <string>
+
+module fcl.crypto.bls_signature;
+
+import fcl.crypto.bls_common;
+import fcl.crypto.common;
+import fcl.exception.exception;
 
 namespace fcl::crypto::blslib {
 
@@ -25,10 +37,10 @@ namespace fcl::crypto::blslib {
    static std::array<uint8_t, 192> sig_parse_base64url(const std::string& base64urlstr) {
       try {
          auto res = std::mismatch(config::bls_signature_prefix.begin(), config::bls_signature_prefix.end(), base64urlstr.begin());
-         FCL_ASSERT(res.first == config::bls_signature_prefix.end(), "BLS Signature has invalid format : ${str}", ("str", base64urlstr));
+         FCL_ASSERT(res.first == config::bls_signature_prefix.end(), "BLS Signature has invalid format : ${str}", fcl::error::ctx("str", base64urlstr));
          auto data_str = base64urlstr.substr(config::bls_signature_prefix.size());
          return fcl::crypto::blslib::deserialize_base64url<std::array<uint8_t, 192>>(data_str);
-      } FCL_RETHROW_EXCEPTIONS( warn, "error parsing bls_signature", ("str", base64urlstr ) )
+      } FCL_CAPTURE_AND_RETHROW("error parsing bls_signature", fcl::error::ctx("str", base64urlstr ))
    }
 
    bls_signature::bls_signature(const std::string& base64urlstr)
@@ -68,4 +80,4 @@ namespace fcl {
    void from_variant(const variant& var, crypto::blslib::bls_aggregate_signature& vo) {
       vo = crypto::blslib::bls_aggregate_signature(var.as_string());
    }
-} // fc
+} // namespace fcl

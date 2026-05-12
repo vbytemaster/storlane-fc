@@ -1,10 +1,9 @@
-#include <fcl/core/byteswap.hpp>
-#include <fcl/core/uint128.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/crypto/bigint.hpp>
+module;
 #include <boost/multiprecision/cpp_int.hpp>
 
 #include <stdexcept>
+
+module fcl.core.uint128;
 
 namespace fcl
 {
@@ -116,17 +115,6 @@ namespace fcl
       }
     }
 
-
-    uint128::operator bigint()const
-    {
-       auto tmp  = uint128( bswap_64( hi ), bswap_64( lo ) );
-       bigint bi( (char*)&tmp, sizeof(tmp) );
-       return bi;
-    }
-    uint128::uint128( const fcl::bigint& bi )
-    {
-       *this = uint128( std::string(bi) ); // TODO: optimize this...
-    }
 
     uint128::operator std::string ()const
     {
@@ -374,16 +362,6 @@ namespace fcl
       return _popcount_64( lo ) + _popcount_64( hi );
    }
 
-   void to_variant( const uint128& var,  variant& vo )  { vo = std::string(var);         }
-   void from_variant( const variant& var,  uint128& vo ){ vo = uint128(var.as_string()); }
-/*
-   void to_variant( const unsigned __int128& var,  variant& vo ) { to_variant( uint128(var), vo); }
-   void from_variant( const variant& var,  unsigned __int128& vo ) {
-      uint128 tmp;
-      from_variant( var, tmp );
-      vo = (unsigned __int128)tmp;
-   }
-*/
 } // namespace fcl
 
 

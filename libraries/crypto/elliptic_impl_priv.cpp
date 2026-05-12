@@ -1,34 +1,43 @@
-#include <fcl/core/fwd_impl.hpp>
-
+module;
+#include <fcl/exception/macros.hpp>
+#include <exception>
+#include <memory>
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
+#include <utility>
 
+module fcl.crypto.elliptic;
+
+import fcl.crypto.sha256;
+import fcl.exception.exception;
 #include "_elliptic_impl_priv.hpp"
 
 /* used by mixed + secp256k1 */
 
-namespace fcl { namespace ecc {
+namespace fcl::ecc {
     namespace detail {
 
-        private_key_impl::private_key_impl() BOOST_NOEXCEPT {}
+        private_key_impl::private_key_impl() noexcept {}
 
-        private_key_impl::private_key_impl( const private_key_impl& cpy ) BOOST_NOEXCEPT
+        private_key_impl::private_key_impl( const private_key_impl& cpy ) noexcept
         {
             this->_key = cpy._key;
         }
 
-        private_key_impl& private_key_impl::operator=( const private_key_impl& pk ) BOOST_NOEXCEPT
+        private_key_impl& private_key_impl::operator=( const private_key_impl& pk ) noexcept
         {
             _key = pk._key;
             return *this;
         }
     }
 
-    static const private_key_secret empty_priv;
+    static const private_key_secret empty_priv{};
 
-    private_key::private_key() {}
+    private_key::private_key()
+    : my( std::make_unique<detail::private_key_impl>() ) {}
 
-    private_key::private_key( const private_key& pk ) : my( pk.my ) {}
+    private_key::private_key( const private_key& pk )
+    : my( pk.my ? std::make_unique<detail::private_key_impl>( *pk.my ) : nullptr ) {}
 
     private_key::private_key( private_key&& pk ) : my( std::move( pk.my ) ) {}
 
@@ -42,7 +51,7 @@ namespace fcl { namespace ecc {
 
     private_key& private_key::operator=( const private_key& pk )
     {
-        my = pk.my;
+        my = pk.my ? std::make_unique<detail::private_key_impl>( *pk.my ) : nullptr;
         return *this;
     }
 
@@ -88,11 +97,11 @@ namespace fcl { namespace ecc {
         do
         {
             FCL_ASSERT( secp256k1_ecdsa_sign_recoverable( detail::_get_context(), &secp_sig, (unsigned char*) digest.data(), (unsigned char*) my->_key.data(), extended_nonce_function, &counter ));
-            secp256k1_ecdsa_recoverable_signature_serialize_compact( detail::_get_context(), result.data + 1, &recid, &secp_sig);
+            secp256k1_ecdsa_recoverable_signature_serialize_compact( detail::_get_context(), result.data() + 1, &recid, &secp_sig);
         } while( require_canonical && !public_key::is_canonical( result ) );
 
         result.begin()[0] = 27 + 4 + recid;
         return result;
     }
 
-}}
+} // namespace fcl::ecc

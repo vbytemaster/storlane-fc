@@ -1,6 +1,7 @@
 file(GLOB FCL_CRYPTO_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
 add_library(fcl_crypto OBJECT ${FCL_CRYPTO_SOURCES})
+fcl_target_modules(fcl_crypto crypto)
 
 target_include_directories(
    fcl_crypto PUBLIC
@@ -16,6 +17,11 @@ target_compile_definitions(
 
 target_link_libraries(
    fcl_crypto PUBLIC
+      fcl_core
+      fcl_exception
+      fcl_raw
+      fcl_reflect
+      fcl_variant
       Boost::headers
       GMP::gmp
       OpenSSL::Crypto

@@ -1,11 +1,18 @@
-#include <fcl/crypto/bigint.hpp>
-#include <fcl/core/utility.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <bit>
 #include <openssl/bn.h>
-#include <fcl/core/byteswap.hpp>
-#include <fcl/variant/variant.hpp>
-#include <fcl/crypto/base64.hpp>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <fcl/exception/exception.hpp>
+module fcl.crypto.bigint;
+
+import fcl.core.utility;
+import fcl.variant;
+import fcl.crypto.base64;
+
+import fcl.exception.exception;
 
 namespace fcl {
       bigint::bigint( const char* bige, uint32_t l ) {
@@ -31,7 +38,7 @@ namespace fcl {
 
       bigint::bigint(uint64_t value)
       {
-        uint64_t big_endian_value = bswap_64(value);
+        uint64_t big_endian_value = std::byteswap(value);
         n = BN_bin2bn((const unsigned char*)&big_endian_value, sizeof(big_endian_value), NULL);
       }
 
@@ -56,7 +63,7 @@ namespace fcl {
         size_t size = BN_num_bytes(n);
         uint64_t abs_value = 0;
         BN_bn2bin(n, (unsigned char*)&abs_value + (sizeof(uint64_t) - size));
-        return BN_is_negative(n) ? -(int64_t)bswap_64(abs_value) : bswap_64(abs_value);
+        return BN_is_negative(n) ? -(int64_t)std::byteswap(abs_value) : std::byteswap(abs_value);
       }
 
       int64_t bigint::log2()const { return BN_num_bits(n); }

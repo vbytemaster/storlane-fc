@@ -1,6 +1,10 @@
-#include <gmp.h>
-#include <fcl/crypto/modular_arithmetic.hpp>
+module;
 #include <algorithm>
+#include <gmp.h>
+#include <variant>
+#include <vector>
+
+module fcl.crypto.modular_arithmetic;
 
 namespace fcl {
 

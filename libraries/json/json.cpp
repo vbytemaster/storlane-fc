@@ -1,834 +1,437 @@
-#include <fcl/json/json.hpp>
-#include <fcl/log/logger.hpp>
-#include <fcl/core/utf8.hpp>
-#include <iostream>
+module;
+
+#include <glaze/glaze.hpp>
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
+module fcl.json;
 
-namespace fcl
-{
-    // forward declarations of provided functions
-    template<typename T, json::parse_type parser_type> variant variant_from_stream( T& in, uint32_t max_depth );
-    template<typename T> char parseEscape( T& in );
-    template<typename T> std::string stringFromStream( T& in );
-    template<typename T> bool skip_white_space( T& in );
-    template<typename T> std::string stringFromToken( T& in );
-    template<typename T, json::parse_type parser_type> variant_object objectFromStream( T& in, uint32_t max_depth );
-    template<typename T, json::parse_type parser_type> variants arrayFromStream( T& in, uint32_t max_depth );
-    template<typename T, json::parse_type parser_type> variant number_from_stream( T& in );
-    template<typename T> variant token_from_stream( T& in );
-    template<typename T> void to_stream( T& os, const variants& a, const json::yield_function_t& yield, json::output_formatting format );
-    template<typename T> void to_stream( T& os, const variant_object& o, const json::yield_function_t& yield, json::output_formatting format );
-    template<typename T> void to_stream( T& os, const variant& v, const json::yield_function_t& yield, json::output_formatting format );
-    std::string pretty_print( const std::string& v, uint8_t indent );
+import fcl.config;
+import fcl.schema;
+import fcl.variant;
+
+namespace fcl::json {
+namespace {
+
+using codec_value = glz::generic_json<glz::num_mode::u64>;
+
+constexpr glz::opts json_read_options{
+   .format = glz::JSON,
+   .null_terminated = true,
+   .comments = false,
+   .error_on_unknown_keys = false,
+};
+
+constexpr glz::opts json_write_compact_options{
+   .format = glz::JSON,
+   .null_terminated = true,
+   .comments = false,
+   .error_on_unknown_keys = false,
+   .skip_null_members = false,
+   .prettify = false,
+};
+
+constexpr glz::opts json_write_pretty_options{
+   .format = glz::JSON,
+   .null_terminated = true,
+   .comments = false,
+   .error_on_unknown_keys = false,
+   .skip_null_members = false,
+   .prettify = true,
+};
+
+template <class... Ts>
+struct overloaded : Ts... {
+   using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+[[nodiscard]] schema::diagnostic make_error(std::string path, std::string code, std::string message) {
+   return schema::diagnostic{
+      .path = std::move(path),
+      .code = std::move(code),
+      .level = schema::severity::error,
+      .message = std::move(message),
+   };
 }
 
-#include <fcl/json/json_relaxed.hpp>
+[[nodiscard]] variant to_variant_value(const codec_value& input);
+[[nodiscard]] config::value to_config_value(const codec_value& input);
+[[nodiscard]] codec_value from_variant_value(const variant& input);
+[[nodiscard]] codec_value from_config_value(const config::value& input);
 
-namespace fcl
-{
-   template<typename T>
-   char parseEscape( T& in )
-   {
-      if( in.peek() == '\\' )
-      {
-         try {
-            in.get();
-            switch( in.peek() )
-            {
-               case 't':
-                  in.get();
-                  return '\t';
-               case 'n':
-                  in.get();
-                  return '\n';
-               case 'r':
-                  in.get();
-                  return '\r';
-               case '\\':
-                  in.get();
-                  return '\\';
-               default:
-                  return in.get();
+[[nodiscard]] variant to_variant_value(const codec_value& input) {
+   return std::visit(
+      overloaded{
+         [](std::nullptr_t) -> variant {
+            return variant{};
+         },
+         [](std::uint64_t value) -> variant {
+            return variant{value};
+         },
+         [](std::int64_t value) -> variant {
+            return variant{value};
+         },
+         [](double value) -> variant {
+            return variant{value};
+         },
+         [](const std::string& value) -> variant {
+            return variant{value};
+         },
+         [](bool value) -> variant {
+            return variant{value};
+         },
+         [](const codec_value::array_t& value) -> variant {
+            auto array = variants{};
+            array.reserve(value.size());
+            for (const auto& entry : value) {
+               array.push_back(to_variant_value(entry));
             }
-         } FCL_RETHROW_EXCEPTIONS( info, "Stream ended with '\\'" );
-      }
-	    FCL_THROW_EXCEPTION( parse_error_exception, "Expected '\\'"  );
-   }
-
-   template<typename T>
-   bool skip_white_space( T& in )
-   {
-       bool skipped = false;
-       while( true )
-       {
-          switch( in.peek() )
-          {
-             case ' ':
-             case '\t':
-             case '\n':
-             case '\r':
-                skipped = true;
-                in.get();
-                break;
-             case '\0':
-                FCL_THROW_EXCEPTION( eof_exception, "unexpected end of file" );
-                break;
-             default:
-                return skipped;
-          }
-       }
-   }
-
-   template<typename T>
-   std::string stringFromStream( T& in )
-   {
-      std::string token;
-      try
-      {
-         char c = in.peek();
-
-         if( c != '"' )
-            FCL_THROW_EXCEPTION( parse_error_exception,
-                                            "Expected '\"' but read '${char}'",
-                                            ("char", std::string(&c, (&c) + 1) ) );
-         in.get();
-         while( !in.eof() )
-         {
-            switch( c = in.peek() )
-            {
-               case '\\':
-                  token += parseEscape( in );
-                  break;
-               case 0x04:
-                  FCL_THROW_EXCEPTION( parse_error_exception, "EOF before closing '\"' in string '${token}'",
-                                                   ("token", token ) );
-               case '"':
-                  in.get();
-                  return token;
-               default:
-                  token += c;
-                  in.get();
+            return variant{std::move(array)};
+         },
+         [](const codec_value::object_t& value) -> variant {
+            auto object = mutable_variant_object{};
+            for (const auto& [key, entry] : value) {
+               object.set(key, to_variant_value(entry));
             }
-         }
-         FCL_THROW_EXCEPTION( parse_error_exception, "EOF before closing '\"' in string '${token}'",
-                                          ("token", token ) );
-       } FCL_RETHROW_EXCEPTIONS( warn, "while parsing token '${token}'",
-                                          ("token", token ) );
-   }
+            return variant{std::move(object)};
+         },
+      },
+      input.data);
+}
 
-   template<typename T>
-   std::string stringFromToken( T& in )
-   {
-      std::string token;
-      try
-      {
-         char c = in.peek();
-
-         while( !in.eof() )
-         {
-            switch( c = in.peek() )
-            {
-               case '\\':
-                  token += parseEscape( in );
-                  break;
-               case '\t':
-               case ' ':
-               case '\n':
-                  in.get();
-                  return token;
-               case '\0':
-                  FCL_THROW_EXCEPTION( eof_exception, "unexpected end of file" );
-               default:
-                if( isalnum( c ) || c == '_' || c == '-' || c == '.' || c == ':' || c == '/' )
-                {
-                  token += c;
-                  in.get();
-                }
-                else return token;
+[[nodiscard]] config::value to_config_value(const codec_value& input) {
+   return std::visit(
+      overloaded{
+         [](std::nullptr_t) -> config::value {
+            return config::value{};
+         },
+         [](std::uint64_t value) -> config::value {
+            return config::value{value};
+         },
+         [](std::int64_t value) -> config::value {
+            return config::value{value};
+         },
+         [](double value) -> config::value {
+            return config::value{value};
+         },
+         [](const std::string& value) -> config::value {
+            return config::value{value};
+         },
+         [](bool value) -> config::value {
+            return config::value{value};
+         },
+         [](const codec_value::array_t& value) -> config::value {
+            auto array = config::value::array_type{};
+            array.reserve(value.size());
+            for (const auto& entry : value) {
+               array.push_back(to_config_value(entry));
             }
-         }
-         return token;
-      }
-      catch( const fcl::eof_exception& eof )
-      {
-         return token;
-      }
-      catch (const std::ios_base::failure&)
-      {
-         return token;
-      }
-
-      FCL_RETHROW_EXCEPTIONS( warn, "while parsing token '${token}'", ("token", token) );
-   }
-
-   template<typename T, json::parse_type parser_type>
-   variant_object objectFromStream( T& in, uint32_t max_depth )
-   {
-      mutable_variant_object obj;
-      try
-      {
-         char c = in.peek();
-         if( c != '{' )
-            FCL_THROW_EXCEPTION( parse_error_exception,
-                                     "Expected '{', but read '${char}'",
-                                     ("char",std::string(&c, &c + 1)) );
-         in.get();
-         while( in.peek() != '}' )
-         {
-            if( in.peek() == ',' )
-            {
-               in.get();
-               continue;
+            return config::value{std::move(array)};
+         },
+         [](const codec_value::object_t& value) -> config::value {
+            auto object = config::value::object_type{};
+            for (const auto& [key, entry] : value) {
+               object.emplace(key, to_config_value(entry));
             }
-            if( skip_white_space(in) ) continue;
-            std::string key = stringFromStream( in );
-            skip_white_space(in);
-            if( in.peek() != ':' )
-            {
-               FCL_THROW_EXCEPTION( parse_error_exception, "Expected ':' after key \"${key}\"",
-                                        ("key", key) );
+            return config::value{std::move(object)};
+         },
+      },
+      input.data);
+}
+
+[[nodiscard]] codec_value from_variant_value(const variant& input) {
+   auto output = codec_value{};
+   switch (input.get_type()) {
+      case variant::null_type:
+         output = nullptr;
+         break;
+      case variant::int64_type:
+         output = input.as_int64();
+         break;
+      case variant::uint64_type:
+         output = input.as_uint64();
+         break;
+      case variant::double_type:
+         output = input.as_double();
+         break;
+      case variant::bool_type:
+         output = input.as_bool();
+         break;
+      case variant::string_type:
+         output = input.get_string();
+         break;
+      case variant::array_type: {
+         auto array = codec_value::array_t{};
+         array.reserve(input.get_array().size());
+         for (const auto& entry : input.get_array()) {
+            array.push_back(from_variant_value(entry));
+         }
+         output = std::move(array);
+         break;
+      }
+      case variant::object_type: {
+         auto object = codec_value::object_t{};
+         for (const auto& entry : input.get_object()) {
+            object.insert(std::make_pair(entry.key(), from_variant_value(entry.value())));
+         }
+         output = std::move(object);
+         break;
+      }
+      case variant::blob_type:
+         output = input.as_string();
+         break;
+   }
+   return output;
+}
+
+[[nodiscard]] codec_value from_config_value(const config::value& input) {
+   auto output = codec_value{};
+   std::visit(
+      overloaded{
+         [&](std::monostate) {
+            output = nullptr;
+         },
+         [&](bool value) {
+            output = value;
+         },
+         [&](std::int64_t value) {
+            output = value;
+         },
+         [&](std::uint64_t value) {
+            output = value;
+         },
+         [&](double value) {
+            output = value;
+         },
+         [&](const std::string& value) {
+            output = value;
+         },
+         [&](const config::value::array_type& value) {
+            auto array = codec_value::array_t{};
+            array.reserve(value.size());
+            for (const auto& entry : value) {
+               array.push_back(from_config_value(entry));
             }
-            in.get();
-            auto val = variant_from_stream<T, parser_type>( in, max_depth - 1 );
+            output = std::move(array);
+         },
+         [&](const config::value::object_type& value) {
+            auto object = codec_value::object_t{};
+            for (const auto& [key, entry] : value) {
+               object.insert(std::make_pair(key, from_config_value(entry)));
+            }
+            output = std::move(object);
+         },
+      },
+      input.storage);
+   return output;
+}
 
-            obj(std::move(key),std::move(val));
-            //skip_white_space(in);
-         }
-         if( in.peek() == '}' )
-         {
-            in.get();
-            return obj;
-         }
-         FCL_THROW_EXCEPTION( parse_error_exception, "Expected '}' after ${variant}", ("variant", std::move(obj) ) );
-      }
-      catch( const fcl::eof_exception& e )
-      {
-         FCL_THROW_EXCEPTION( parse_error_exception, "Unexpected EOF: ${e}", ("e", e.to_detail_string() ) );
-      }
-      catch( const std::ios_base::failure& e )
-      {
-         FCL_THROW_EXCEPTION( parse_error_exception, "Unexpected EOF: ${e}", ("e", e.what() ) );
-      } FCL_RETHROW_EXCEPTIONS( warn, "Error parsing object" );
+[[nodiscard]] bool exceeds_depth(const variant& value, std::size_t max_depth, std::size_t depth = 0) {
+   if (depth > max_depth) {
+      return true;
    }
-
-   template<typename T, json::parse_type parser_type>
-   variants arrayFromStream( T& in, uint32_t max_depth )
-   {
-      variants ar;
-      try
-      {
-        if( in.peek() != '[' )
-           FCL_THROW_EXCEPTION( parse_error_exception, "Expected '['" );
-        in.get();
-        skip_white_space(in);
-
-        while( in.peek() != ']' )
-        {
-           if( in.peek() == ',' )
-           {
-              in.get();
-              continue;
-           }
-           if( skip_white_space(in) ) continue;
-           ar.push_back( variant_from_stream<T, parser_type>( in, max_depth - 1) );
-           skip_white_space(in);
-        }
-        if( in.peek() != ']' )
-           FCL_THROW_EXCEPTION( parse_error_exception, "Expected ']' after parsing ${variant}",
-                                    ("variant", ar) );
-
-        in.get();
-      } FCL_RETHROW_EXCEPTIONS( warn, "Attempting to parse array ${array}",
-                                         ("array", ar ) );
-      return ar;
-   }
-
-   template<typename T, json::parse_type parser_type>
-   variant number_from_stream( T& in )
-   {
-      std::string s;
-
-      bool  dot = false;
-      bool  neg = false;
-      if( in.peek() == '-')
-      {
-        neg = true;
-        s += in.get();
-      }
-      bool done = false;
-
-      try
-      {
-        while( !done )
-        {
-          char c = in.peek();
-          switch( c )
-          {
-              case '.':
-                 if (dot)
-                    FCL_THROW_EXCEPTION(parse_error_exception, "Can't parse a number with two decimal places");
-                 dot = true;
-              case '0':
-              case '1':
-              case '2':
-              case '3':
-              case '4':
-              case '5':
-              case '6':
-              case '7':
-              case '8':
-              case '9':
-                 s += in.get();
-                 break;
-              case '\0':
-                 FCL_THROW_EXCEPTION( eof_exception, "unexpected end of file" );
-              default:
-                 if( isalnum( c ) )
-                 {
-                    s += stringFromToken( in );
-                    return s;
-                 }
-                done = true;
-                break;
-          }
-        }
-      }
-      catch (fcl::eof_exception&)
-      {
-      }
-      catch (const std::ios_base::failure&)
-      {
-      }
-      const std::string& str = s;
-      if (str == "-." || str == "." || str == "-") // check the obviously wrong things we could have encountered
-        FCL_THROW_EXCEPTION(parse_error_exception, "Can't parse token \"${token}\" as a JSON numeric constant", ("token", str));
-      if( dot )
-        return parser_type == json::parse_type::legacy_parser_with_string_doubles ? variant(str) : variant(to_double(str));
-      if( neg )
-        return to_int64(str);
-      return to_uint64(str);
-   }
-
-   template<typename T>
-   variant token_from_stream( T& in )
-   {
-      std::string s;
-      bool received_eof = false;
-      bool done = false;
-
-      try
-      {
-        char c;
-        while((c = in.peek()) && !done)
-        {
-           switch( c )
-           {
-              case 'n':
-              case 'u':
-              case 'l':
-              case 't':
-              case 'r':
-              case 'e':
-              case 'f':
-              case 'a':
-              case 's':
-                 s += in.get();
-                 break;
-              default:
-                 done = true;
-                 break;
-           }
-        }
-      }
-      catch (fcl::eof_exception&)
-      {
-        received_eof = true;
-      }
-      catch (const std::ios_base::failure&)
-      {
-        received_eof = true;
-      }
-
-      // we can get here either by processing a delimiter as in "null,"
-      // an EOF like "null<EOF>", or an invalid token like "nullZ"
-      const std::string& str = s;
-      if( str == "null" )
-        return variant();
-      if( str == "true" )
-        return true;
-      if( str == "false" )
-        return false;
-      else
-      {
-        if (received_eof)
-        {
-          if (str.empty())
-            FCL_THROW_EXCEPTION( parse_error_exception, "Unexpected EOF" );
-          else
-            return str;
-        }
-        else
-        {
-          // if we've reached this point, we've either seen a partial
-          // token ("tru<EOF>") or something our simple parser couldn't
-          // make out ("falfe")
-          // A strict JSON parser would signal this as an error, but we
-          // will just treat the malformed token as an un-quoted string.
-          return str + stringFromToken(in);;
-        }
-      }
-   }
-
-
-   template<typename T, json::parse_type parser_type>
-   variant variant_from_stream( T& in, uint32_t max_depth )
-   {
-      if( max_depth == 0 )
-          FCL_THROW_EXCEPTION( parse_error_exception, "Too many nested items in JSON input!" );
-      skip_white_space(in);
-      variant var;
-      while( 1 )
-      {
-         signed char c = in.peek();
-         switch( c )
-         {
-            case ' ':
-            case '\t':
-            case '\n':
-            case '\r':
-              in.get();
-              continue;
-            case '"':
-              return stringFromStream( in );
-            case '{':
-               return objectFromStream<T, parser_type>( in, max_depth - 1 );
-            case '[':
-              return arrayFromStream<T, parser_type>( in, max_depth - 1 );
-            case '-':
-            case '.':
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-              return number_from_stream<T, parser_type>( in );
-            // null, true, false, or 'warning' / string
-            case 'n':
-            case 't':
-            case 'f':
-              return token_from_stream( in );
-            case 0x04: // ^D end of transmission
-            case EOF:
-            case '\0':
-              FCL_THROW_EXCEPTION( eof_exception, "unexpected end of file" );
-            default:
-              FCL_THROW_EXCEPTION( parse_error_exception, "Unexpected char '${c}' in \"${s}\"",
-                                 ("c", c)("s", stringFromToken(in)) );
+   if (value.is_array()) {
+      for (const auto& entry : value.get_array()) {
+         if (exceeds_depth(entry, max_depth, depth + 1)) {
+            return true;
          }
       }
-	  return variant();
-   }
-
-   variant json::from_string( const std::string& utf8_str, const json::parse_type ptype, const uint32_t max_depth )
-   { try {
-      using stream_t = boost::iostreams::stream<boost::iostreams::array_source>;
-      stream_t in(utf8_str.c_str(), utf8_str.size());
-      switch( ptype )
-      {
-          case parse_type::legacy_parser:
-             return variant_from_stream<stream_t, json::parse_type::legacy_parser>( in, max_depth );
-          case parse_type::legacy_parser_with_string_doubles:
-              return variant_from_stream<stream_t, json::parse_type::legacy_parser_with_string_doubles>( in, max_depth );
-          case parse_type::strict_parser:
-              return json_relaxed::variant_from_stream<stream_t, true>( in, max_depth );
-          case parse_type::relaxed_parser:
-              return json_relaxed::variant_from_stream<stream_t, false>( in, max_depth );
-          default:
-              FCL_ASSERT( false, "Unknown JSON parser type {ptype}", ("ptype", static_cast<int>(ptype)) );
-      }
-   } FCL_RETHROW_EXCEPTIONS( warn, "", ("str",utf8_str) ) }
-
-   /**
-    *  Convert '\t', '\r', '\n', '\\' and '"'  to "\t\r\n\\\"" if escape_control_chars == true
-    *  Convert all other < 32 & 127 ascii to escaped unicode "\u00xx"
-    *  Removes invalid utf8 characters
-    *  Escapes Control sequence Introducer 0x9b to \u009b
-    *  All other characters unmolested.
-    */
-   std::string escape_string( const std::string_view& str, const json::yield_function_t& yield, bool escape_control_chars )
-   {
-      std::string r;
-      const auto init_size = str.size();
-      r.reserve( init_size + 13 ); // allow for a few escapes
-      size_t i = 0;
-      for( auto itr = str.begin(); itr != str.end(); ++i,++itr )
-      {
-         if( i % json::escape_string_yield_check_count == 0 ) yield( init_size + r.size() );
-         switch( *itr )
-         {
-            case '\x00': r += "\\u0000"; break;
-            case '\x01': r += "\\u0001"; break;
-            case '\x02': r += "\\u0002"; break;
-            case '\x03': r += "\\u0003"; break;
-            case '\x04': r += "\\u0004"; break;
-            case '\x05': r += "\\u0005"; break;
-            case '\x06': r += "\\u0006"; break;
-            case '\x07': r += "\\u0007"; break; // \a is not valid JSON
-            case '\x08': r += "\\u0008"; break; // \b
-         // case '\x09': r += "\\u0009"; break; // \t
-         // case '\x0a': r += "\\u000a"; break; // \n
-            case '\x0b': r += "\\u000b"; break;
-            case '\x0c': r += "\\u000c"; break; // \f
-         // case '\x0d': r += "\\u000d"; break; // \r
-            case '\x0e': r += "\\u000e"; break;
-            case '\x0f': r += "\\u000f"; break;
-            case '\x10': r += "\\u0010"; break;
-            case '\x11': r += "\\u0011"; break;
-            case '\x12': r += "\\u0012"; break;
-            case '\x13': r += "\\u0013"; break;
-            case '\x14': r += "\\u0014"; break;
-            case '\x15': r += "\\u0015"; break;
-            case '\x16': r += "\\u0016"; break;
-            case '\x17': r += "\\u0017"; break;
-            case '\x18': r += "\\u0018"; break;
-            case '\x19': r += "\\u0019"; break;
-            case '\x1a': r += "\\u001a"; break;
-            case '\x1b': r += "\\u001b"; break;
-            case '\x1c': r += "\\u001c"; break;
-            case '\x1d': r += "\\u001d"; break;
-            case '\x1e': r += "\\u001e"; break;
-            case '\x1f': r += "\\u001f"; break;
-
-            case '\x7f': r += "\\u007f"; break;
-
-            // if escape_control_chars=true these fall-through to default
-            case '\t':        // \x09
-               if( escape_control_chars ) {
-                  r += "\\t";
-                  break;
-               }
-            case '\n':        // \x0a
-               if( escape_control_chars ) {
-                  r += "\\n";
-                  break;
-               }
-            case '\r':        // \x0d
-               if( escape_control_chars ) {
-                  r += "\\r";
-                  break;
-               }
-            case '\\':
-               if( escape_control_chars ) {
-                  r += "\\\\";
-                  break;
-               }
-            case '\"':
-               if( escape_control_chars ) {
-                  r += "\\\"";
-                  break;
-               }
-            default:
-               r += *itr;
+   } else if (value.is_object()) {
+      for (const auto& entry : value.get_object()) {
+         if (exceeds_depth(entry.value(), max_depth, depth + 1)) {
+            return true;
          }
       }
-
-      return is_valid_utf8( r ) ? r : prune_invalid_utf8( r );
    }
+   return false;
+}
 
-   template<typename T>
-   void to_stream( T& os, const variants& a, const json::yield_function_t& yield, const json::output_formatting format )
-   {
-      yield(os.tellp());
-      os << '[';
-      auto itr = a.begin();
-
-      while( itr != a.end() )
-      {
-         to_stream( os, *itr, yield, format );
-         ++itr;
-         if( itr != a.end() )
-            os << ',';
-      }
-      os << ']';
+[[nodiscard]] bool exceeds_depth(const config::value& value, std::size_t max_depth, std::size_t depth = 0) {
+   if (depth > max_depth) {
+      return true;
    }
-
-   template<typename T>
-   void to_stream( T& os, const variant_object& o, const json::yield_function_t& yield, const json::output_formatting format )
-   {
-       yield(os.tellp());
-       os << '{';
-       auto itr = o.begin();
-
-       while( itr != o.end() )
-       {
-          os << '"' << escape_string( itr->key(), yield ) << '"';
-          os << ':';
-          to_stream( os, itr->value(), yield, format );
-          ++itr;
-          if( itr != o.end() )
-             os << ',';
-       }
-       os << '}';
-   }
-
-   template<typename T>
-   void to_stream( T& os, const variant& v, const json::yield_function_t& yield, const json::output_formatting format )
-   {
-      yield(os.tellp());
-      switch( v.get_type() )
-      {
-         case variant::null_type:
-              os << "null";
-              return;
-         case variant::int64_type:
-         {
-              int64_t i = v.as_int64();
-              constexpr int64_t max_value(0xffffffff);
-              if( format == json::output_formatting::stringify_large_ints_and_doubles &&
-                  (i > max_value || i < -max_value))
-                 os << '"'<<v.as_string()<<'"';
-              else
-                 os << i;
-
-              return;
-         }
-         case variant::uint64_type:
-         {
-              uint64_t i = v.as_uint64();
-              if( format == json::output_formatting::stringify_large_ints_and_doubles &&
-                  i > 0xffffffff )
-                 os << '"'<<v.as_string()<<'"';
-              else
-                 os << i;
-
-              return;
-         }
-         case variant::double_type:
-              if (format == json::output_formatting::stringify_large_ints_and_doubles)
-                 os << '"'<<v.as_string()<<'"';
-              else
-                 os << v.as_string();
-              return;
-         case variant::bool_type:
-              os << v.as_string();
-              return;
-         case variant::string_type:
-              os << '"' << escape_string( v.get_string(), yield ) << '"';
-              return;
-         case variant::blob_type:
-              os << '"' << escape_string( v.as_string(), yield ) << '"';
-              return;
-         case variant::array_type:
-           {
-              const variants&  a = v.get_array();
-              to_stream( os, a, yield, format );
-              return;
-           }
-         case variant::object_type:
-           {
-              const variant_object& o =  v.get_object();
-              to_stream(os, o, yield, format );
-              return;
-           }
-         default:
-            FCL_THROW_EXCEPTION( fcl::invalid_arg_exception, "Unsupported variant type: " + std::to_string( v.get_type() ) );
-      }
-   }
-
-   std::string   json::to_string( const variant& v, const json::yield_function_t& yield, const json::output_formatting format )
-   {
-      std::stringstream ss;
-      fcl::to_stream( ss, v, yield, format );
-      yield(ss.tellp());
-      return ss.str();
-   }
-
-   std::string pretty_print( const std::string& v, const uint8_t indent ) {
-      int level = 0;
-      std::stringstream ss;
-      bool first = false;
-      bool quote = false;
-      bool escape = false;
-      for( uint32_t i = 0; i < v.size(); ++i ) {
-         switch( v[i] ) {
-            case '\\':
-              if( !escape ) {
-                if( quote )
-                  escape = true;
-              } else { escape = false; }
-              ss<<v[i];
-              break;
-            case ':':
-              if( !quote ) {
-                ss<<": ";
-              } else {
-                ss<<':';
-              }
-              break;
-            case '"':
-              if( first ) {
-                 ss<<'\n';
-                 for( int i = 0; i < level*indent; ++i ) ss<<' ';
-                 first = false;
-              }
-              if( !escape ) {
-                quote = !quote;
-              }
-              escape = false;
-              ss<<'"';
-              break;
-            case '{':
-            case '[':
-              ss<<v[i];
-              if( !quote ) {
-                ++level;
-                first = true;
-              }else {
-                escape = false;
-              }
-              break;
-            case '}':
-            case ']':
-              if( !quote ) {
-                if( v[i-1] != '[' && v[i-1] != '{' ) {
-                  ss<<'\n';
-                }
-                --level;
-                if( !first ) {
-                  for( int i = 0; i < level*indent; ++i ) ss<<' ';
-                }
-                first = false;
-                ss<<v[i];
-                break;
-              } else {
-                escape = false;
-                ss<<v[i];
-              }
-              break;
-            case ',':
-              if( !quote ) {
-                ss<<',';
-                first = true;
-              } else {
-                escape = false;
-                ss<<',';
-              }
-              break;
-            case 'n':
-              //If we're in quotes and see a \n, \b, \f, \r, \t, or \u, just print it literally but unset the escape flag.
-            case 'b':
-            case 'f':
-            case 'r':
-            case 't':
-            case 'u':
-              if( quote && escape )
-                escape = false;
-              //No break; fall through to default case
-            default:
-              if( first ) {
-                 ss<<'\n';
-                 for( int i = 0; i < level*indent; ++i ) ss<<' ';
-                 first = false;
-              }
-              ss << v[i];
+   if (const auto* array = value.as_array()) {
+      for (const auto& entry : *array) {
+         if (exceeds_depth(entry, max_depth, depth + 1)) {
+            return true;
          }
       }
-      return ss.str();
-    }
-
-   std::string json::to_pretty_string( const variant& v, const json::yield_function_t& yield, const json::output_formatting format ) {
-
-      auto s = to_string(v, yield, format);
-      return pretty_print( std::move( s ), 2);
-   }
-
-   bool json::save_to_file( const variant& v, const std::filesystem::path& fi, const bool pretty, const json::output_formatting format )
-   {
-      if( pretty ) {
-         auto str = json::to_pretty_string( v, fcl::time_point::maximum(), format, max_length_limit );
-         std::ofstream o(fi.generic_string().c_str());
-         o.write( str.c_str(), str.size() );
-         return o.good();
-      } else {
-         std::ofstream o(fi.generic_string().c_str());
-         const auto yield = [&](size_t s) {
-            // no limitation
-         };
-         fcl::to_stream( o, v, yield, format );
-         return o.good();
+   } else if (const auto* object = value.as_object()) {
+      for (const auto& [unused, entry] : *object) {
+         if (exceeds_depth(entry, max_depth, depth + 1)) {
+            return true;
+         }
       }
    }
-   variant json::from_file( const std::filesystem::path& p, const json::parse_type ptype, const uint32_t max_depth )
-   {
-      //auto tmp = std::make_shared<fcl::ifstream>( p, ifstream::binary );
-      //auto tmp = std::make_shared<std::ifstream>( p.generic_string().c_str(), std::ios::binary );
-      //buffered_istream bi( tmp );
-      std::ifstream bi( p.string(), std::ios::binary );
-      switch( ptype )
-      {
-          case json::parse_type::legacy_parser:
-             return variant_from_stream<std::ifstream, json::parse_type::legacy_parser>( bi, max_depth );
-          case json::parse_type::legacy_parser_with_string_doubles:
-              return variant_from_stream<std::ifstream, json::parse_type::legacy_parser_with_string_doubles>( bi, max_depth );
-          case json::parse_type::strict_parser:
-              return json_relaxed::variant_from_stream<std::ifstream, true>( bi, max_depth );
-          case json::parse_type::relaxed_parser:
-              return json_relaxed::variant_from_stream<std::ifstream, false>( bi, max_depth );
-          default:
-              FCL_ASSERT( false, "Unknown JSON parser type {ptype}", ("ptype", static_cast<int>(ptype)) );
-      }
-   }
-   /*
-   variant json::from_stream( buffered_istream& in, parse_type ptype, uint32_t max_depth )
-   {
-      switch( ptype )
-      {
-          case legacy_parser:
-              return variant_from_stream<fcl::buffered_istream, legacy_parser>( in, max_depth );
-          case legacy_parser_with_string_doubles:
-              return variant_from_stream<fcl::buffered_istream, legacy_parser_with_string_doubles>( in, max_depth );
-          case strict_parser:
-              return json_relaxed::variant_from_stream<buffered_istream, true>( in, max_depth );
-          case relaxed_parser:
-              return json_relaxed::variant_from_stream<buffered_istream, false>( in, max_depth );
-          default:
-              FCL_ASSERT( false, "Unknown JSON parser type {ptype}", ("ptype", ptype) );
-      }
-   }
-   */
+   return false;
+}
 
-   bool json::is_valid( const std::string& utf8_str, const json::parse_type ptype, const uint32_t max_depth )
-   {
-      if( utf8_str.size() == 0 ) return false;
-      std::stringstream in( utf8_str );
-      switch( ptype )
-      {
-          case json::parse_type::legacy_parser:
-             variant_from_stream<std::stringstream, json::parse_type::legacy_parser>( in, max_depth );
-              break;
-          case json::parse_type::legacy_parser_with_string_doubles:
-             variant_from_stream<std::stringstream, json::parse_type::legacy_parser_with_string_doubles>( in, max_depth );
-              break;
-          case json::parse_type::strict_parser:
-             json_relaxed::variant_from_stream<std::stringstream, true>( in, max_depth );
-              break;
-          case json::parse_type::relaxed_parser:
-             json_relaxed::variant_from_stream<std::stringstream, false>( in, max_depth );
-              break;
-          default:
-              FCL_ASSERT( false, "Unknown JSON parser type {ptype}", ("ptype", static_cast<int>(ptype)) );
-      }
-      try { in.peek(); } catch ( const eof_exception& e ) { return true; }
+[[nodiscard]] read_result<codec_value> read_codec_value(std::string_view input, const read_options& options) {
+   auto result = read_result<codec_value>{};
+   auto parsed = codec_value{};
+   if (auto error = glz::read<json_read_options>(parsed, input)) {
+      result.diagnostics.push_back(make_error(
+         options.source_name,
+         "json.parse",
+         glz::format_error(error, input)));
+      return result;
+   }
+   result.value = std::move(parsed);
+   return result;
+}
+
+[[nodiscard]] std::string read_file_text(const std::filesystem::path& path, std::vector<schema::diagnostic>& diagnostics, std::string_view code) {
+   auto input = std::ifstream{path, std::ios::binary};
+   if (!input) {
+      diagnostics.push_back(make_error(path.string(), std::string{code}, "failed to open file"));
+      return {};
+   }
+   return std::string{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+}
+
+[[nodiscard]] bool write_file_text(
+   const std::filesystem::path& path,
+   std::string_view text,
+   std::vector<schema::diagnostic>& diagnostics,
+   std::string_view code) {
+   auto output = std::ofstream{path, std::ios::binary | std::ios::trunc};
+   if (!output) {
+      diagnostics.push_back(make_error(path.string(), std::string{code}, "failed to open file for writing"));
       return false;
    }
+   output.write(text.data(), static_cast<std::streamsize>(text.size()));
+   if (!output) {
+      diagnostics.push_back(make_error(path.string(), std::string{code}, "failed to write file"));
+      return false;
+   }
+   return true;
+}
 
-} // fc
+[[nodiscard]] write_result write_codec_value(const codec_value& input, const write_options& options) {
+   auto result = write_result{};
+   if (std::chrono::system_clock::now() > options.deadline) {
+      result.diagnostics.push_back(make_error({}, "json.deadline", "JSON write deadline expired"));
+      return result;
+   }
+
+   auto text = std::string{};
+   const auto error = options.pretty
+      ? glz::write<json_write_pretty_options>(input, text)
+      : glz::write<json_write_compact_options>(input, text);
+   if (error) {
+      result.diagnostics.push_back(make_error({}, "json.write", glz::format_error(error, text)));
+      return result;
+   }
+   if (text.size() > options.max_bytes) {
+      result.diagnostics.push_back(make_error({}, "json.max-bytes", "JSON output exceeds configured byte limit"));
+      return result;
+   }
+   result.text = std::move(text);
+   return result;
+}
+
+} // namespace
+
+read_result<variant> read_value(std::string_view input, read_options options) {
+   auto parsed = read_codec_value(input, options);
+   auto result = read_result<variant>{};
+   result.diagnostics = std::move(parsed.diagnostics);
+   if (!parsed.ok()) {
+      return result;
+   }
+   result.value = to_variant_value(parsed.value);
+   if (exceeds_depth(result.value, options.max_depth)) {
+      result.diagnostics.push_back(make_error(options.source_name, "json.depth", "JSON input exceeds configured maximum depth"));
+   }
+   return result;
+}
+
+write_result write_value(const variant& input, write_options options) {
+   return write_codec_value(from_variant_value(input), options);
+}
+
+read_result<config::document> read_document(std::string_view input, read_options options) {
+   auto parsed = read_codec_value(input, options);
+   auto result = read_result<config::document>{};
+   result.diagnostics = std::move(parsed.diagnostics);
+   if (!parsed.ok()) {
+      return result;
+   }
+
+   auto root = to_config_value(parsed.value);
+   if (exceeds_depth(root, options.max_depth)) {
+      result.diagnostics.push_back(make_error(options.source_name, "json.depth", "JSON input exceeds configured maximum depth"));
+      return result;
+   }
+   const auto* object = root.as_object();
+   if (!object) {
+      result.diagnostics.push_back(make_error(options.source_name, "json.document", "JSON config document root must be an object"));
+      return result;
+   }
+   result.value.root = *object;
+   return result;
+}
+
+write_result write_document(const config::document& input, write_options options) {
+   return write_codec_value(from_config_value(config::value{input.root}), options);
+}
+
+read_result<variant> load_value(const std::filesystem::path& path, read_options options) {
+   auto diagnostics = std::vector<schema::diagnostic>{};
+   const auto text = read_file_text(path, diagnostics, "json.io");
+   if (!diagnostics.empty()) {
+      return read_result<variant>{.diagnostics = std::move(diagnostics)};
+   }
+   if (options.source_name.empty()) {
+      options.source_name = path.string();
+   }
+   return read_value(text, std::move(options));
+}
+
+write_result save_value(const std::filesystem::path& path, const variant& input, write_options options) {
+   auto result = write_value(input, std::move(options));
+   if (!result.ok()) {
+      return result;
+   }
+   if (!write_file_text(path, result.text, result.diagnostics, "json.io")) {
+      return result;
+   }
+   return result;
+}
+
+read_result<config::document> load_document(const std::filesystem::path& path, read_options options) {
+   auto diagnostics = std::vector<schema::diagnostic>{};
+   const auto text = read_file_text(path, diagnostics, "json.io");
+   if (!diagnostics.empty()) {
+      return read_result<config::document>{.diagnostics = std::move(diagnostics)};
+   }
+   if (options.source_name.empty()) {
+      options.source_name = path.string();
+   }
+   return read_document(text, std::move(options));
+}
+
+write_result save_document(const std::filesystem::path& path, const config::document& input, write_options options) {
+   auto result = write_document(input, std::move(options));
+   if (!result.ok()) {
+      return result;
+   }
+   if (!write_file_text(path, result.text, result.diagnostics, "json.io")) {
+      return result;
+   }
+   return result;
+}
+
+} // namespace fcl::json

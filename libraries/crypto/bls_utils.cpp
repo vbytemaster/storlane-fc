@@ -1,4 +1,12 @@
-#include <fcl/crypto/bls_utils.hpp>
+module;
+#include <bls12-381/bls12-381.hpp>
+#include <cstdint>
+#include <span>
+
+module fcl.crypto.bls_utils;
+
+import fcl.crypto.bls_public_key;
+import fcl.crypto.bls_signature;
 
 namespace fcl::crypto::blslib {
 

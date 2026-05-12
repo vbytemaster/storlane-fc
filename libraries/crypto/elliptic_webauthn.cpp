@@ -1,18 +1,23 @@
-#include <fcl/crypto/elliptic_webauthn.hpp>
-#include <fcl/crypto/elliptic_r1.hpp>
-#include <fcl/crypto/openssl.hpp>
-
-#include <fcl/core/fwd_impl.hpp>
-#include <fcl/exception/exception.hpp>
-#include <fcl/log/logger.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstring>
+#include <exception>
+#include <string>
+#include <vector>
 
 #define RAPIDJSON_NAMESPACE_BEGIN namespace fcl::crypto::webauthn::detail::rapidjson {
 #define RAPIDJSON_NAMESPACE_END }
 #include "rapidjson/reader.h"
 
-#include <string>
+module fcl.crypto.elliptic_webauthn;
 
-namespace fcl { namespace crypto { namespace webauthn {
+import fcl.crypto.base64;
+import fcl.crypto.elliptic_r1;
+import fcl.crypto.openssl;
+import fcl.crypto.sha256;
+import fcl.exception.exception;
+
+namespace fcl::crypto::webauthn {
 
 namespace detail {
 using namespace std::literals;
@@ -91,7 +96,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog("String: current_state(${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "String: current_state(${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
    }
 
@@ -116,7 +121,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog( "Key: current_state (${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "StartObject: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
    }
    bool Key(const char* str, rapidjson::SizeType length, bool copy) {
@@ -144,7 +149,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog( "Key: current_state (${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "Key: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
    }
    bool EndObject(rapidjson::SizeType memberCount) {
@@ -165,7 +170,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog( "EndObject: current_state (${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "EndObject: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
    }
 
@@ -188,7 +193,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog( "StartArray: current_state (${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "StartArray: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
 
    }
@@ -209,7 +214,7 @@ struct webauthn_json_handler : public rapidjson::BaseReaderHandler<rapidjson::UT
       }
       // Add elog to report the error and __builtin_unreachable to surpress
       // warning of control reaches end of non-void function.
-      elog( "EndArray: current_state (${current_statea}) out of bound", ("current_state", current_state) );
+      FCL_ASSERT(false, "EndArray: current_state (${current_state}) out of bound", fcl::error::ctx("current_state", current_state) );
       __builtin_unreachable();
    }
 };
@@ -250,9 +255,9 @@ public_key::public_key(const signature& c, const fcl::sha256& digest, bool) {
    e.write(client_data_hash.data(), client_data_hash.data_size());
    fcl::sha256 signed_digest = e.result();
 
-   int nV = c.compact_signature.data[0];
+   int nV = c.compact_signature.data()[0];
    if (nV<31 || nV>=35)
-      FCL_THROW_EXCEPTION( exception, "unable to reconstruct public key from signature" );
+      FCL_THROW("unable to reconstruct public key from signature");
    public_key_data = r1::recover_public_key_data(c.compact_signature, signed_digest, false);
 }
 
@@ -260,4 +265,4 @@ void public_key::post_init() {
    FCL_ASSERT(rpid.length(), "webauthn pubkey must have non empty rpid");
 }
 
-}}}
+} // namespace fcl::crypto::webauthn

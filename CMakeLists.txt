@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.31)
 project(storlane-fc VERSION 0.1.0 LANGUAGES C CXX ASM)
 
 include(GNUInstallDirs)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
    include(CTest)
@@ -15,6 +16,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(FCL_ENABLE_MODULES "Build FCL public module interfaces when supported" ON)
 option(FCL_ENABLE_VENDOR_TESTS "Build donor dependency tests and benchmarks" OFF)
+option(FCL_ENABLE_TUI "Build FCL Notcurses-backed terminal UI library when notcurses-core is available" ON)
+
+if(FCL_ENABLE_MODULES AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+   message(FATAL_ERROR "FCL_ENABLE_MODULES=ON requires module-capable Homebrew LLVM clang++; AppleClang is not a supported FCL module toolchain")
+endif()
 
 if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
    add_compile_options(-fdiagnostics-color=always)
@@ -40,10 +46,45 @@ find_package(Threads REQUIRED)
 
 find_package(
    Boost 1.90 REQUIRED CONFIG
-   COMPONENTS headers date_time chrono iostreams thread
+   COMPONENTS headers date_time iostreams url program_options
 )
 
-find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
+find_package(OpenSSL 3.5 REQUIRED COMPONENTS SSL Crypto)
+find_package(Ngtcp2 REQUIRED)
+find_package(glaze 7.5 CONFIG REQUIRED)
+if(TARGET glaze::glaze)
+   message(STATUS "FCL codec backend: glaze::glaze")
+else()
+   message(FATAL_ERROR "Glaze was found, but target glaze::glaze is not available")
+endif()
+
+set(FCL_TUI_NOTCURSES_TARGET "")
+if(FCL_ENABLE_TUI)
+   find_package(Notcurses CONFIG QUIET)
+   if(TARGET Notcurses::notcurses-core)
+      set(FCL_TUI_NOTCURSES_TARGET Notcurses::notcurses-core)
+   elseif(TARGET notcurses::notcurses-core)
+      set(FCL_TUI_NOTCURSES_TARGET notcurses::notcurses-core)
+   elseif(TARGET notcurses-core)
+      set(FCL_TUI_NOTCURSES_TARGET notcurses-core)
+   endif()
+
+   if(NOT FCL_TUI_NOTCURSES_TARGET)
+      find_package(PkgConfig QUIET)
+      if(PkgConfig_FOUND)
+         pkg_check_modules(NOTCURSES_CORE QUIET IMPORTED_TARGET notcurses-core)
+         if(TARGET PkgConfig::NOTCURSES_CORE)
+            set(FCL_TUI_NOTCURSES_TARGET PkgConfig::NOTCURSES_CORE)
+         endif()
+      endif()
+   endif()
+
+   if(FCL_TUI_NOTCURSES_TARGET)
+      message(STATUS "FCL TUI backend: ${FCL_TUI_NOTCURSES_TARGET}")
+   else()
+      message(STATUS "Skipping fcl_tui: notcurses-core not found; install notcurses-core or set FCL_ENABLE_TUI=OFF")
+   endif()
+endif()
 
 function(fcl_add_header_only_boost_target component)
    if(NOT TARGET Boost::${component})
@@ -59,7 +100,6 @@ fcl_add_header_only_boost_target(asio)
 fcl_add_header_only_boost_target(beast)
 fcl_add_header_only_boost_target(crc)
 fcl_add_header_only_boost_target(dll)
-fcl_add_header_only_boost_target(interprocess)
 fcl_add_header_only_boost_target(multi_index)
 fcl_add_header_only_boost_target(multiprecision)
 
@@ -119,13 +159,46 @@ set(
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/core/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/exception/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/reflect/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/schema/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/variant/include"
-   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/io/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/raw/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/json/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/config/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/yaml/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/program_options/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/log/include"
    "${CMAKE_CURRENT_SOURCE_DIR}/libraries/crypto/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/asio/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/http/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/websocket/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/quic/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/p2p/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/libraries/app/include"
 )
+
+if(FCL_ENABLE_TUI AND FCL_TUI_NOTCURSES_TARGET)
+   list(APPEND FCL_PUBLIC_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/libraries/tui/include")
+endif()
+
+
+function(fcl_target_modules target lib)
+   file(
+      GLOB _fcl_target_module_files CONFIGURE_DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/include/fcl/${lib}/*.cppm"
+   )
+   if(NOT _fcl_target_module_files)
+      message(FATAL_ERROR "No public FCL module interfaces found for ${target} in ${CMAKE_CURRENT_SOURCE_DIR}/include/fcl/${lib}")
+   endif()
+
+   target_sources(
+      ${target}
+      PUBLIC
+         FILE_SET CXX_MODULES
+         BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include"
+         FILES ${_fcl_target_module_files}
+   )
+endfunction()
+
 
 add_library(secp256k1-internal INTERFACE)
 target_include_directories(secp256k1-internal INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1/src")
@@ -178,26 +251,56 @@ if(NOT FCL_ENABLE_VENDOR_TESTS)
    )
 endif()
 
+
 add_subdirectory(libraries/core)
 add_subdirectory(libraries/exception)
 add_subdirectory(libraries/reflect)
+add_subdirectory(libraries/schema)
 add_subdirectory(libraries/variant)
-add_subdirectory(libraries/io)
 add_subdirectory(libraries/raw)
+add_subdirectory(libraries/config)
 add_subdirectory(libraries/json)
+add_subdirectory(libraries/yaml)
+add_subdirectory(libraries/program_options)
 add_subdirectory(libraries/log)
 add_subdirectory(libraries/crypto)
+add_subdirectory(libraries/asio)
+add_subdirectory(libraries/http)
+add_subdirectory(libraries/websocket)
+add_subdirectory(libraries/quic)
+add_subdirectory(libraries/p2p)
+add_subdirectory(libraries/app)
+if(FCL_ENABLE_TUI AND FCL_TUI_NOTCURSES_TARGET)
+   add_subdirectory(libraries/tui)
+endif()
 
-add_library(
-   fcl STATIC
+set(
+   FCL_OBJECT_SOURCES
    $<TARGET_OBJECTS:fcl_core>
    $<TARGET_OBJECTS:fcl_exception>
+   $<TARGET_OBJECTS:fcl_reflect>
+   $<TARGET_OBJECTS:fcl_schema>
    $<TARGET_OBJECTS:fcl_variant>
-   $<TARGET_OBJECTS:fcl_io>
+   $<TARGET_OBJECTS:fcl_raw>
+   $<TARGET_OBJECTS:fcl_config>
    $<TARGET_OBJECTS:fcl_json>
+   $<TARGET_OBJECTS:fcl_yaml>
+   $<TARGET_OBJECTS:fcl_program_options>
    $<TARGET_OBJECTS:fcl_log>
    $<TARGET_OBJECTS:fcl_crypto>
+   $<TARGET_OBJECTS:fcl_asio>
+   $<TARGET_OBJECTS:fcl_http>
+   $<TARGET_OBJECTS:fcl_websocket>
+   $<TARGET_OBJECTS:fcl_quic>
+   $<TARGET_OBJECTS:fcl_p2p>
+   $<TARGET_OBJECTS:fcl_app>
 )
+
+if(TARGET fcl_tui)
+   list(APPEND FCL_OBJECT_SOURCES $<TARGET_OBJECTS:fcl_tui>)
+endif()
+
+add_library(fcl STATIC ${FCL_OBJECT_SOURCES})
 
 target_include_directories(fcl PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS})
 
@@ -212,29 +315,36 @@ target_link_libraries(
       fcl_core
       fcl_exception
       fcl_reflect
+      fcl_schema
       fcl_variant
-      fcl_io
       fcl_raw
+      fcl_config
       fcl_json
+      fcl_yaml
+      fcl_program_options
       fcl_log
       fcl_crypto
+      fcl_asio
+      fcl_http
+      fcl_websocket
+      fcl_quic
+      fcl_p2p
+      fcl_app
       GMP::gmp
-      Boost::date_time
-      Boost::chrono
-      Boost::iostreams
-      Boost::interprocess
-      Boost::multi_index
-      Boost::dll
-      Boost::multiprecision
-      Boost::thread
-      Boost::crc
       Threads::Threads
+      OpenSSL::SSL
       OpenSSL::Crypto
+      Ngtcp2::ngtcp2
+      Ngtcp2::crypto_ossl
       ${PLATFORM_SPECIFIC_LIBS}
       ${CMAKE_DL_LIBS}
       secp256k1
       bls12-381
 )
+
+if(TARGET fcl_tui)
+   target_link_libraries(fcl PUBLIC fcl_tui)
+endif()
 
 if(WIN32)
    target_link_libraries(fcl PUBLIC ws2_32 mswsock userenv)
@@ -260,11 +370,27 @@ install(
    DIRECTORY libraries/core/include/fcl
              libraries/exception/include/fcl
              libraries/reflect/include/fcl
+             libraries/schema/include/fcl
              libraries/variant/include/fcl
-             libraries/io/include/fcl
              libraries/raw/include/fcl
              libraries/json/include/fcl
+             libraries/config/include/fcl
+             libraries/yaml/include/fcl
+             libraries/program_options/include/fcl
              libraries/log/include/fcl
              libraries/crypto/include/fcl
+             libraries/asio/include/fcl
+             libraries/http/include/fcl
+             libraries/websocket/include/fcl
+             libraries/quic/include/fcl
+             libraries/p2p/include/fcl
+             libraries/app/include/fcl
    DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR} COMPONENT dev EXCLUDE_FROM_ALL
 )
+
+if(TARGET fcl_tui)
+   install(
+      DIRECTORY libraries/tui/include/fcl
+      DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR} COMPONENT dev EXCLUDE_FROM_ALL
+   )
+endif()

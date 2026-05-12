@@ -1,6 +1,14 @@
-#include <fcl/variant/variant_object.hpp>
-#include <fcl/exception/exception.hpp>
+module;
+#include <cassert>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
 
+
+module fcl.variant.value;
+
+import fcl.core.utility;
 
 namespace fcl
 {
@@ -85,7 +93,7 @@ namespace fcl
    {
       auto itr = find( key );
       if( itr != end() ) return itr->value();
-      FCL_THROW_EXCEPTION( key_not_found_exception, "Key ${key}", ("key",key) );
+      throw std::out_of_range("variant object key not found");
    }
 
    size_t variant_object::size() const
@@ -247,7 +255,7 @@ namespace fcl
    {
       auto itr = find( key );
       if( itr != end() ) return itr->value();
-      FCL_THROW_EXCEPTION( key_not_found_exception, "Key ${key}", ("key",key) );
+      throw std::out_of_range("variant object key not found");
    }
    variant& mutable_variant_object::operator[]( const std::string& key )
    {
@@ -438,4 +446,4 @@ namespace fcl
       vo = var.get_object();
    }
 
-} // namesapce fc
+} // namespace fcl

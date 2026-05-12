@@ -1,8 +1,25 @@
-#include <fcl/crypto/public_key.hpp>
-#include <fcl/crypto/common.hpp>
-#include <fcl/exception/exception.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstdint>
+#include <exception>
+#include <ostream>
+#include <string>
+#include <variant>
+#include <vector>
 
-namespace fcl { namespace crypto {
+module fcl.crypto.public_key;
+
+import fcl.core.utility;
+import fcl.crypto.base58;
+import fcl.crypto.common;
+import fcl.crypto.sha256;
+import fcl.crypto.signature;
+import fcl.exception.exception;
+import fcl.raw.raw;
+import fcl.variant.static_variant;
+import fcl.variant;
+
+namespace fcl::crypto {
 
    struct recovery_visitor : fcl::visitor<public_key::storage_type> {
       recovery_visitor(const sha256& digest, bool check_canonical)
@@ -20,7 +37,7 @@ namespace fcl { namespace crypto {
    };
 
    public_key::public_key( const signature& c, const sha256& digest, bool check_canonical )
-   :_storage(std::visit(recovery_visitor(digest, check_canonical), c._storage))
+   :_storage(std::visit(recovery_visitor(digest, check_canonical), c.storage()))
    {
    }
 
@@ -45,13 +62,16 @@ namespace fcl { namespace crypto {
          constexpr auto prefix = config::public_key_base_prefix;
 
          const auto pivot = base58str.find('_');
-         FCL_ASSERT(pivot != std::string::npos, "No delimiter in string, cannot determine data type: ${str}", ("str", base58str));
+         FCL_ASSERT(pivot != std::string::npos, "No delimiter in string, cannot determine data type: ${str}", fcl::error::ctx("str", base58str));
 
          const auto prefix_str = base58str.substr(0, pivot);
-         FCL_ASSERT(prefix == prefix_str, "Public Key has invalid prefix: ${str}", ("str", base58str)("prefix_str", prefix_str));
+         FCL_ASSERT(prefix == prefix_str,
+                    "Public Key has invalid prefix",
+                    fcl::error::ctx("str", base58str),
+                    fcl::error::ctx("prefix_str", prefix_str));
 
          auto data_str = base58str.substr(pivot + 1);
-         FCL_ASSERT(!data_str.empty(), "Public Key has no data: ${str}", ("str", base58str));
+         FCL_ASSERT(!data_str.empty(), "Public Key has no data: ${str}", fcl::error::ctx("str", base58str));
          return base58_str_parser<public_key::storage_type, config::public_key_prefix>::apply(data_str);
       }
    }
@@ -101,7 +121,7 @@ namespace fcl { namespace crypto {
    {
       return less_comparator<public_key::storage_type>::apply(p1._storage, p2._storage);
    }
-} } // fcl::crypto
+} // namespace fcl::crypto
 
 namespace fcl
 {
@@ -115,4 +135,4 @@ namespace fcl
    {
       vo = fcl::crypto::public_key(var.as_string());
    }
-} // fc
+} // namespace fcl

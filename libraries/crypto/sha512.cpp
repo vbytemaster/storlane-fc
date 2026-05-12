@@ -1,9 +1,20 @@
-#include <fcl/crypto/hex.hpp>
-#include <fcl/crypto/hmac.hpp>
-#include <fcl/core/fwd_impl.hpp>
-#include <string.h>
-#include <fcl/crypto/sha512.hpp>
-#include <fcl/variant/variant.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+#include <string>
+
+module fcl.crypto.sha512;
+
+import fcl.core.utility;
+import fcl.crypto.hex;
+import fcl.crypto.hmac;
+import fcl.exception.exception;
+import fcl.variant;
+
 #include "_digest_common.hpp"
 #include "_evp_digest.hpp"
 
@@ -30,7 +41,8 @@ namespace fcl {
     };
 
     sha512::encoder::~encoder() {}
-    sha512::encoder::encoder() {
+    sha512::encoder::encoder()
+    : my( std::make_unique<impl>() ) {
       reset();
     }
 

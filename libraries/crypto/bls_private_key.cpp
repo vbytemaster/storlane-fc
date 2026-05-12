@@ -1,9 +1,22 @@
-#include <fcl/crypto/bls_private_key.hpp>
-#include <fcl/crypto/rand.hpp>
-#include <fcl/core/utility.hpp>
-#include <fcl/crypto/common.hpp>
-#include <fcl/exception/exception.hpp>
-#include <fcl/crypto/bls_common.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <algorithm>
+#include <array>
+#include <bls12-381/bls12-381.hpp>
+#include <cstdint>
+#include <span>
+#include <string>
+#include <vector>
+
+module fcl.crypto.bls_private_key;
+
+import fcl.core.utility;
+import fcl.crypto.bls_common;
+import fcl.crypto.bls_public_key;
+import fcl.crypto.bls_signature;
+import fcl.crypto.common;
+import fcl.crypto.rand;
+import fcl.exception.exception;
 
 namespace fcl::crypto::blslib {
 
@@ -37,7 +50,7 @@ namespace fcl::crypto::blslib {
    {
       auto res = std::mismatch(config::bls_private_key_prefix.begin(), config::bls_private_key_prefix.end(),
                                base64urlstr.begin());
-      FCL_ASSERT(res.first == config::bls_private_key_prefix.end(), "BLS Private Key has invalid format : ${str}", ("str", base64urlstr));
+      FCL_ASSERT(res.first == config::bls_private_key_prefix.end(), "BLS Private Key has invalid format : ${str}", fcl::error::ctx("str", base64urlstr));
 
       auto data_str = base64urlstr.substr(config::bls_private_key_prefix.size());
 
@@ -75,4 +88,4 @@ namespace fcl
       vo = crypto::blslib::bls_private_key(var.as_string());
    }
 
-} // fc
+} // namespace fcl

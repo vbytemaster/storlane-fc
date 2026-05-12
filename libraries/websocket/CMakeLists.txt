@@ -1,0 +1,16 @@
+add_library(
+   fcl_websocket OBJECT
+   connection.cpp
+   client.cpp
+)
+fcl_target_modules(fcl_websocket websocket)
+
+target_include_directories(fcl_websocket PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS})
+
+target_link_libraries(
+   fcl_websocket PUBLIC
+      fcl_asio
+      Boost::asio
+      Boost::beast
+      OpenSSL::SSL
+)

@@ -1,14 +1,28 @@
-#include <fcl/crypto/signature.hpp>
-#include <fcl/crypto/common.hpp>
-#include <fcl/exception/exception.hpp>
+module;
+#include <fcl/exception/macros.hpp>
+#include <exception>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <variant>
 
-namespace fcl { namespace crypto {
+module fcl.crypto.signature;
+
+import fcl.core.utility;
+import fcl.crypto.common;
+import fcl.crypto.elliptic_webauthn;
+import fcl.exception.exception;
+import fcl.variant.static_variant;
+import fcl.variant;
+
+namespace fcl::crypto {
    struct hash_visitor : public fcl::visitor<size_t> {
       template<typename SigType>
       size_t operator()(const SigType& sig) const {
-         static_assert(sizeof(sig._data.data) == 65, "sig size is expected to be 65");
+         static_assert(std::tuple_size_v<std::remove_reference_t<decltype(sig._data)>> == 65, "sig size is expected to be 65");
          //signatures are two bignums: r & s. Just add up least significant digits of the two
-         return *(size_t*)&sig._data.data[32-sizeof(size_t)] + *(size_t*)&sig._data.data[64-sizeof(size_t)];
+         return *(size_t*)&sig._data.data()[32-sizeof(size_t)] + *(size_t*)&sig._data.data()[64-sizeof(size_t)];
       }
 
       size_t operator()(const webauthn::signature& sig) const {
@@ -21,15 +35,18 @@ namespace fcl { namespace crypto {
       constexpr auto prefix = config::signature_base_prefix;
 
       const auto pivot = base58str.find('_');
-      FCL_ASSERT(pivot != std::string::npos, "No delimiter in string, cannot determine type: ${str}", ("str", base58str));
+      FCL_ASSERT(pivot != std::string::npos, "No delimiter in string, cannot determine type: ${str}", fcl::error::ctx("str", base58str));
 
       const auto prefix_str = base58str.substr(0, pivot);
-      FCL_ASSERT(prefix == prefix_str, "Signature Key has invalid prefix: ${str}", ("str", base58str)("prefix_str", prefix_str));
+      FCL_ASSERT(prefix == prefix_str,
+                 "Signature Key has invalid prefix",
+                 fcl::error::ctx("str", base58str),
+                 fcl::error::ctx("prefix_str", prefix_str));
 
       auto data_str = base58str.substr(pivot + 1);
-      FCL_ASSERT(!data_str.empty(), "Signature has no data: ${str}", ("str", base58str));
+      FCL_ASSERT(!data_str.empty(), "Signature has no data: ${str}", fcl::error::ctx("str", base58str));
       return base58_str_parser<signature::storage_type, config::signature_prefix>::apply(data_str);
-   } FCL_RETHROW_EXCEPTIONS( warn, "error parsing signature", ("str", base58str ) ) }
+   } FCL_CAPTURE_AND_RETHROW("error parsing signature", fcl::error::ctx("str", base58str )) }
 
    signature::signature(const std::string& base58str)
       :_storage(sig_parse_base58(base58str))
@@ -81,7 +98,7 @@ namespace fcl { namespace crypto {
    size_t hash_value(const signature& b) {
        return std::visit(hash_visitor(), b._storage);
    }
-} } // eosio::blockchain
+} // namespace fcl::crypto
 
 namespace fcl
 {
@@ -94,4 +111,4 @@ namespace fcl
    {
       vo = fcl::crypto::signature(var.as_string());
    }
-} // fc
+} // namespace fcl

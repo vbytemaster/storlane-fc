@@ -1,6 +1,6 @@
-#include <fcl/log/appender.hpp>
-#include <fcl/log/console_appender.hpp>
-#include <fcl/log/logger_config.hpp>
+import fcl.log.appender;
+import fcl.log.console_appender;
+import fcl.log.logger_config;
 
 
 namespace fcl {

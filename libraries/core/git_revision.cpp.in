@@ -1,4 +1,7 @@
-#include <fcl/core/git_revision.hpp>
+module;
+#include <stdint.h>
+
+module fcl.core.git_revision;
 
 #define FCL_GIT_REVISION_SHA "@FCL_GIT_REVISION_SHA@"
 #define FCL_GIT_REVISION_UNIX_TIMESTAMP @FCL_GIT_REVISION_UNIX_TIMESTAMP@
