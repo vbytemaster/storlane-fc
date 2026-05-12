@@ -1,0 +1,14 @@
+module;
+#include <stdint.h>
+
+module fcl.core.git_revision;
+
+#define FCL_GIT_REVISION_SHA "@FCL_GIT_REVISION_SHA@"
+#define FCL_GIT_REVISION_UNIX_TIMESTAMP @FCL_GIT_REVISION_UNIX_TIMESTAMP@
+
+namespace fcl {
+
+const char* const git_revision_sha = FCL_GIT_REVISION_SHA;
+const uint32_t git_revision_unix_timestamp = FCL_GIT_REVISION_UNIX_TIMESTAMP;
+
+} // end namespace fcl

@@ -1,0 +1,35 @@
+module;
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+export module fcl.crypto.kdf;
+
+import fcl.crypto.types;
+
+export namespace fcl::crypto {
+
+inline constexpr auto default_derived_key_size = std::size_t{32};
+
+struct hkdf_sha256_request {
+   bytes secret;
+   bytes salt;
+   bytes info;
+   std::size_t output_size = default_derived_key_size;
+};
+
+struct scrypt_request {
+   std::string password;
+   bytes salt;
+   std::uint64_t n = 16'384;
+   std::uint64_t r = 8;
+   std::uint64_t p = 1;
+   std::uint64_t max_memory_bytes = 32ULL * 1024ULL * 1024ULL;
+   std::size_t output_size = default_derived_key_size;
+};
+
+[[nodiscard]] bytes derive_hkdf_sha256(const hkdf_sha256_request& request);
+[[nodiscard]] bytes derive_scrypt(const scrypt_request& request);
+
+} // namespace fcl::crypto
