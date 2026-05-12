@@ -8,7 +8,6 @@
     @ingroup tconsole
 */
 
-
 /**
     @defgroup console_styles Console Styles
     @brief Defines styles that can be used within text printed to the Console.
@@ -112,7 +111,6 @@
 #define CONSOLE_STRIKETHROUGH "\033[9m"
 
 /// @}
-
 
 /**
     @defgroup console_colors Console Colors
@@ -269,12 +267,10 @@
 */
 #define CONSOLE_WHITE_BG "\033[47m"
 
-
-
 #else // WIN32
 #include <winsock2.h>
 #include <windows.h>
-//#include <stdlib.h>
+// #include <stdlib.h>
 #include <conio.h>
 
 /**
@@ -300,7 +296,7 @@
     @ingroup tconsole
     (const char*)
 */
-#define CONSOLE_HALF_BRIGHT 
+#define CONSOLE_HALF_BRIGHT
 
 /**
     @def CONSOLE_ITALIC
@@ -311,7 +307,7 @@
 
     (const char*)
 */
-#define CONSOLE_ITALIC 
+#define CONSOLE_ITALIC
 
 /**
     @def CONSOLE_UNDERLINE
@@ -329,7 +325,7 @@
     @ingroup tconsole
     (const char*)
 */
-#define CONSOLE_BLINK 
+#define CONSOLE_BLINK
 
 /**
     @def CONSOLE_RAPID_BLINK
@@ -337,7 +333,7 @@
 
     (const char*)
 */
-#define CONSOLE_RAPID_BLINK 
+#define CONSOLE_RAPID_BLINK
 
 /**
     @def CONSOLE_REVERSED
@@ -355,7 +351,7 @@
     @ingroup tconsole
     (const char*)
 */
-#define CONSOLE_CONCEALED 
+#define CONSOLE_CONCEALED
 
 /**
     @def CONSOLE_STRIKETHROUGH
@@ -364,10 +360,9 @@
     @ingroup tconsole
     (const char*)
 */
-#define CONSOLE_STRIKETHROUGH 
+#define CONSOLE_STRIKETHROUGH
 
 /// @}
-
 
 /**
     @defgroup console_colors Console Colors
@@ -525,7 +520,6 @@
 #define CONSOLE_WHITE_BG "\033[47m"
 #endif
 
-
 /// @}
 #else // On Window's no color output WIN32
 #define CONSOLE_DEFAULT ""
@@ -534,7 +528,7 @@
 #define CONSOLE_ITALIC ""
 #define CONSOLE_UNDERLINE ""
 #define CONSOLE_BLINK ""
-#define CONSOLE_RAPID_BLINK "" 
+#define CONSOLE_RAPID_BLINK ""
 #define CONSOLE_REVERSED ""
 #define CONSOLE_CONCEALED ""
 #define CONSOLE_STRIKETHROUGH ""
@@ -550,10 +544,10 @@
 #define CONSOLE_RED_BG ""
 #define CONSOLE_GREEN_BG ""
 #define CONSOLE_BROWN_BG ""
-#define CONSOLE_BLUE_BG  ""
-#define CONSOLE_MAGENTA_BG  ""
-#define CONSOLE_CYAN_BG  ""
-#define CONSOLE_WHITE_BG  ""
+#define CONSOLE_BLUE_BG ""
+#define CONSOLE_MAGENTA_BG ""
+#define CONSOLE_CYAN_BG ""
+#define CONSOLE_WHITE_BG ""
 
 /// @}
 /// @endcond INTERNAL_DEV

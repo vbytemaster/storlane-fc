@@ -35,27 +35,24 @@ struct component_descriptor {
 };
 
 class component_registry {
-public:
+ public:
    void add(component_descriptor descriptor);
 
    [[nodiscard]] const std::vector<component_descriptor>& components() const noexcept {
       return components_;
    }
 
-private:
+ private:
    std::vector<component_descriptor> components_;
 };
 
 class component_view {
-public:
-   component_view(const document& source, std::string section)
-      : source_{&source}
-      , section_{std::move(section)} {}
+ public:
+   component_view(const document& source, std::string section) : source_{&source}, section_{std::move(section)} {}
 
    [[nodiscard]] const value* try_get(std::string_view field) const;
 
-   template <typename T>
-   [[nodiscard]] T get_or(std::string_view field, T fallback) const {
+   template <typename T> [[nodiscard]] T get_or(std::string_view field, T fallback) const {
       const auto* found = try_get(field);
       if (!found) {
          return fallback;
@@ -63,9 +60,8 @@ public:
       return convert_value<T>(*found);
    }
 
-private:
-   template <typename T>
-   [[nodiscard]] static T convert_value(const value& input) {
+ private:
+   template <typename T> [[nodiscard]] static T convert_value(const value& input) {
       using clean_type = std::remove_cvref_t<T>;
       if constexpr (std::same_as<clean_type, bool>) {
          if (const auto* bool_value = std::get_if<bool>(&input.storage)) {

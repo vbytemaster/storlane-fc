@@ -34,9 +34,8 @@ std::runtime_error canceled_error() {
 
 struct task_handle::state {
    state(runtime& runtime_value, std::uint64_t task_id)
-      : runtime_ptr(&runtime_value)
-      , completion_timer(runtime_value.context(), (std::chrono::steady_clock::time_point::max)())
-      , id(task_id) {}
+       : runtime_ptr(&runtime_value),
+         completion_timer(runtime_value.context(), (std::chrono::steady_clock::time_point::max)()), id(task_id) {}
 
    runtime* runtime_ptr = nullptr;
    boost::asio::steady_timer completion_timer;
@@ -164,10 +163,8 @@ struct task_scheduler::impl : std::enable_shared_from_this<task_scheduler::impl>
    };
 
    impl(runtime& runtime_value, task_scheduler_options options_value)
-      : runtime_ref(runtime_value)
-      , options(std::move(options_value))
-      , strand(boost::asio::make_strand(runtime_ref.context()))
-      , ready_timer(strand) {
+       : runtime_ref(runtime_value), options(std::move(options_value)),
+         strand(boost::asio::make_strand(runtime_ref.context())), ready_timer(strand) {
       if (options.max_active_tasks == 0) {
          throw std::invalid_argument{"task scheduler requires at least one active task slot"};
       }
@@ -185,18 +182,17 @@ struct task_scheduler::impl : std::enable_shared_from_this<task_scheduler::impl>
          throw std::invalid_argument{"scheduled task requires work"};
       }
 
-      auto state = std::make_shared<task_handle::state>(
-         runtime_ref,
-         next_task_id.fetch_add(1, std::memory_order_relaxed));
+      auto state =
+          std::make_shared<task_handle::state>(runtime_ref, next_task_id.fetch_add(1, std::memory_order_relaxed));
       state->weak_self = state;
 
       auto queued = queued_task{
-         .state = state,
-         .scheduled_priority = task.priority,
-         .name = std::move(task.name),
-         .work = std::move(task.work),
-         .ready_at = ready_at,
-         .sequence = next_sequence.fetch_add(1, std::memory_order_relaxed),
+          .state = state,
+          .scheduled_priority = task.priority,
+          .name = std::move(task.name),
+          .work = std::move(task.work),
+          .ready_at = ready_at,
+          .sequence = next_sequence.fetch_add(1, std::memory_order_relaxed),
       };
 
       {
@@ -233,9 +229,10 @@ struct task_scheduler::impl : std::enable_shared_from_this<task_scheduler::impl>
          return pending_count_locked();
       }
       const auto matches = [priority_value](const auto& tasks) {
-         return static_cast<std::size_t>(std::count_if(tasks.begin(), tasks.end(), [priority_value](const queued_task& task) {
-            return task.scheduled_priority == *priority_value;
-         }));
+         return static_cast<std::size_t>(
+             std::count_if(tasks.begin(), tasks.end(), [priority_value](const queued_task& task) {
+                return task.scheduled_priority == *priority_value;
+             }));
       };
       return matches(ready_heap) + matches(delayed_heap);
    }
@@ -281,9 +278,7 @@ struct task_scheduler::impl : std::enable_shared_from_this<task_scheduler::impl>
       });
 
       auto lock = std::unique_lock{mutex};
-      active_done.wait(lock, [this] {
-         return active_tasks == 0;
-      });
+      active_done.wait(lock, [this] { return active_tasks == 0; });
    }
 
    void drain() {
@@ -430,7 +425,7 @@ struct task_scheduler::impl : std::enable_shared_from_this<task_scheduler::impl>
 };
 
 task_scheduler::task_scheduler(runtime& runtime, task_scheduler_options options)
-   : impl_(std::make_shared<impl>(runtime, std::move(options))) {}
+    : impl_(std::make_shared<impl>(runtime, std::move(options))) {}
 
 task_scheduler::~task_scheduler() = default;
 

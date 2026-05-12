@@ -16,7 +16,7 @@ struct screen_runner_options {
 };
 
 class screen_runner {
-public:
+ public:
    screen_runner();
    ~screen_runner();
 
@@ -28,7 +28,7 @@ public:
    [[nodiscard]] bool stop_requested() const noexcept;
    [[nodiscard]] terminal_capabilities capabilities() const;
 
-private:
+ private:
    bool stop_requested_ = false;
    terminal_capabilities capabilities_;
 };

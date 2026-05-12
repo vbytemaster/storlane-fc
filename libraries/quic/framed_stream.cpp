@@ -16,10 +16,8 @@ namespace {
 constexpr auto header_size = std::size_t{4};
 
 [[nodiscard]] std::uint32_t read_u32_be(std::span<const std::uint8_t, header_size> bytes) noexcept {
-   return (static_cast<std::uint32_t>(bytes[0]) << 24U) |
-          (static_cast<std::uint32_t>(bytes[1]) << 16U) |
-          (static_cast<std::uint32_t>(bytes[2]) << 8U) |
-          static_cast<std::uint32_t>(bytes[3]);
+   return (static_cast<std::uint32_t>(bytes[0]) << 24U) | (static_cast<std::uint32_t>(bytes[1]) << 16U) |
+          (static_cast<std::uint32_t>(bytes[2]) << 8U) | static_cast<std::uint32_t>(bytes[3]);
 }
 
 void write_u32_be(std::vector<std::uint8_t>& out, std::uint32_t value) {
@@ -64,8 +62,7 @@ frame_decode_result decode_frame(std::span<const std::uint8_t> bytes, frame_code
 }
 
 framed_stream::framed_stream(stream stream_value, frame_codec_options options)
-   : stream_(std::move(stream_value))
-   , options_(options) {}
+    : stream_(std::move(stream_value)), options_(options) {}
 
 framed_stream::framed_stream(framed_stream&&) noexcept = default;
 framed_stream& framed_stream::operator=(framed_stream&&) noexcept = default;

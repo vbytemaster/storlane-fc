@@ -26,7 +26,7 @@ struct connection_metrics {
 };
 
 class connection final : public std::enable_shared_from_this<connection> {
-public:
+ public:
    using ptr = std::shared_ptr<connection>;
    using message_handler = std::function<boost::asio::awaitable<void>(connection&, std::string)>;
    using close_handler = std::function<void(connection&)>;
@@ -50,7 +50,7 @@ public:
    boost::asio::awaitable<void> handshake(std::string host, std::string target);
    void start_read_loop();
 
-private:
+ private:
    struct impl;
 
    explicit connection(boost::beast::tcp_stream stream);

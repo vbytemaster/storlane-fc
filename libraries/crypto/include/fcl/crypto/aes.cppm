@@ -83,7 +83,7 @@ struct aes256_cbc_decrypt_request {
 [[nodiscard]] aes256_key generate_aes256_key();
 
 class aes256_gcm_encoder {
-public:
+ public:
    explicit aes256_gcm_encoder(aes256_gcm_encoder_options options);
    ~aes256_gcm_encoder();
 
@@ -98,13 +98,13 @@ public:
 
    [[nodiscard]] aes256_gcm_authentication finalize();
 
-private:
+ private:
    struct impl;
    std::unique_ptr<impl> _impl;
 };
 
 class aes256_gcm_decoder {
-public:
+ public:
    explicit aes256_gcm_decoder(aes256_gcm_decoder_options options);
    ~aes256_gcm_decoder();
 
@@ -119,21 +119,17 @@ public:
 
    void finalize();
 
-private:
+ private:
    struct impl;
    std::unique_ptr<impl> _impl;
 };
 
-[[nodiscard]] aes256_gcm_ciphertext encrypt_aes256_gcm(
-   const aes256_gcm_encrypt_request& request);
+[[nodiscard]] aes256_gcm_ciphertext encrypt_aes256_gcm(const aes256_gcm_encrypt_request& request);
 
-[[nodiscard]] bytes decrypt_aes256_gcm(
-   const aes256_gcm_decrypt_request& request);
+[[nodiscard]] bytes decrypt_aes256_gcm(const aes256_gcm_decrypt_request& request);
 
-[[nodiscard]] aes256_cbc_ciphertext encrypt_aes256_cbc(
-   const aes256_cbc_encrypt_request& request);
+[[nodiscard]] aes256_cbc_ciphertext encrypt_aes256_cbc(const aes256_cbc_encrypt_request& request);
 
-[[nodiscard]] bytes decrypt_aes256_cbc(
-   const aes256_cbc_decrypt_request& request);
+[[nodiscard]] bytes decrypt_aes256_cbc(const aes256_cbc_decrypt_request& request);
 
 } // namespace fcl::crypto

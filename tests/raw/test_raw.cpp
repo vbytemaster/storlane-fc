@@ -17,18 +17,15 @@ import fcl.variant.dynamic_bitset;
 using namespace fcl;
 
 struct A {
-   int                        x;
-   float                      y;
+   int x;
+   float y;
    std::optional<std::string> z;
 
    bool operator==(const A&) const = default;
 };
 BOOST_DESCRIBE_STRUCT(A, (), (x, y, z))
 
-enum class described_mode : int64_t {
-   read = 7,
-   write = 9
-};
+enum class described_mode : int64_t { read = 7, write = 9 };
 BOOST_DESCRIBE_ENUM(described_mode, read, write)
 
 struct described_base {
@@ -58,14 +55,12 @@ FCL_IMPLEMENT_SERIALIZATION(macro_serialized_record)
 
 BOOST_AUTO_TEST_SUITE(raw_test_suite)
 
-BOOST_AUTO_TEST_CASE(raw_string_golden_bytes)
-{
+BOOST_AUTO_TEST_CASE(raw_string_golden_bytes) {
    const auto packed = fcl::raw::pack(std::string("abc"));
    BOOST_CHECK_EQUAL(fcl::to_hex(packed), "03616263");
 }
 
-BOOST_AUTO_TEST_CASE(boost_describe_struct_preserves_fc_reflect_member_order)
-{
+BOOST_AUTO_TEST_CASE(boost_describe_struct_preserves_fc_reflect_member_order) {
    const A value{2, 2.25f, std::string("abc")};
    const auto packed = fcl::raw::pack(value);
 
@@ -75,8 +70,7 @@ BOOST_AUTO_TEST_CASE(boost_describe_struct_preserves_fc_reflect_member_order)
    BOOST_CHECK(value == unpacked);
 }
 
-BOOST_AUTO_TEST_CASE(boost_describe_enum_uses_old_reflected_enum_int64_layout)
-{
+BOOST_AUTO_TEST_CASE(boost_describe_enum_uses_old_reflected_enum_int64_layout) {
    const auto packed = fcl::raw::pack(described_mode::write);
 
    BOOST_CHECK_EQUAL(fcl::to_hex(packed), "0900000000000000");
@@ -85,8 +79,7 @@ BOOST_AUTO_TEST_CASE(boost_describe_enum_uses_old_reflected_enum_int64_layout)
    BOOST_CHECK(unpacked == described_mode::write);
 }
 
-BOOST_AUTO_TEST_CASE(boost_describe_derived_types_pack_base_first_then_local_members)
-{
+BOOST_AUTO_TEST_CASE(boost_describe_derived_types_pack_base_first_then_local_members) {
    described_child value;
    value.parent = 0x1234;
    value.child = 0x56;
@@ -99,8 +92,7 @@ BOOST_AUTO_TEST_CASE(boost_describe_derived_types_pack_base_first_then_local_mem
    BOOST_CHECK(value == unpacked);
 }
 
-BOOST_AUTO_TEST_CASE(serialization_macros_instantiate_raw_variant_and_digest_pack_paths)
-{
+BOOST_AUTO_TEST_CASE(serialization_macros_instantiate_raw_variant_and_digest_pack_paths) {
    const macro_serialized_record value{0x1234, "node"};
 
    fcl::variant variant_value;
@@ -125,13 +117,11 @@ BOOST_AUTO_TEST_CASE(serialization_macros_instantiate_raw_variant_and_digest_pac
 
    fcl::sha256::encoder digest_stream;
    fcl::raw::pack(digest_stream, value);
-   BOOST_CHECK_EQUAL(
-      digest_stream.result().str(),
-      fcl::sha256::hash(buffer, static_cast<uint32_t>(write_stream.tellp())).str());
+   BOOST_CHECK_EQUAL(digest_stream.result().str(),
+                     fcl::sha256::hash(buffer, static_cast<uint32_t>(write_stream.tellp())).str());
 }
 
-BOOST_AUTO_TEST_CASE(std_chrono_preserves_old_fc_raw_layout)
-{
+BOOST_AUTO_TEST_CASE(std_chrono_preserves_old_fc_raw_layout) {
    using sys_time_us = std::chrono::sys_time<std::chrono::microseconds>;
 
    BOOST_CHECK_EQUAL(fcl::to_hex(fcl::raw::pack(sys_time_us{})), "0000000000000000");
@@ -141,26 +131,25 @@ BOOST_AUTO_TEST_CASE(std_chrono_preserves_old_fc_raw_layout)
 
    BOOST_CHECK(fcl::raw::unpack<sys_time_us>(fcl::raw::pack(sys_time_us{std::chrono::seconds{1}})) ==
                sys_time_us{std::chrono::seconds{1}});
-   BOOST_CHECK(fcl::raw::unpack<std::chrono::sys_seconds>(fcl::raw::pack(std::chrono::sys_seconds{std::chrono::seconds{1}})) ==
-               std::chrono::sys_seconds{std::chrono::seconds{1}});
+   BOOST_CHECK(fcl::raw::unpack<std::chrono::sys_seconds>(fcl::raw::pack(std::chrono::sys_seconds{
+                   std::chrono::seconds{1}})) == std::chrono::sys_seconds{std::chrono::seconds{1}});
    BOOST_CHECK(fcl::raw::unpack<std::chrono::microseconds>(fcl::raw::pack(std::chrono::microseconds{-1})) ==
                std::chrono::microseconds{-1});
    BOOST_CHECK_THROW(fcl::raw::pack(std::chrono::sys_seconds{std::chrono::seconds{-1}}), std::out_of_range);
 }
 
-BOOST_AUTO_TEST_CASE(dynamic_bitset_test)
-{
+BOOST_AUTO_TEST_CASE(dynamic_bitset_test) {
    constexpr uint8_t bits = 0b00011110;
    fcl::dynamic_bitset bs1(8, bits); // bit set size 8
-   
+
    char buff[32];
    datastream<char*> ds(buff, sizeof(buff));
 
-   fcl::raw::pack( ds, bs1 );
+   fcl::raw::pack(ds, bs1);
 
    fcl::dynamic_bitset bs2(8);
    ds.seekp(0);
-   fcl::raw::unpack( ds, bs2 );
+   fcl::raw::unpack(ds, bs2);
 
    // 0b00011110
    BOOST_CHECK(!bs2.test(0));
@@ -174,8 +163,7 @@ BOOST_AUTO_TEST_CASE(dynamic_bitset_test)
    BOOST_CHECK(!bs2.test(7));
 }
 
-BOOST_AUTO_TEST_CASE(dynamic_bitset_large_test)
-{
+BOOST_AUTO_TEST_CASE(dynamic_bitset_large_test) {
    fcl::dynamic_bitset bs1;
    bs1.resize(12345);
 
@@ -195,8 +183,7 @@ BOOST_AUTO_TEST_CASE(dynamic_bitset_large_test)
    BOOST_TEST(unpacked.none());
 }
 
-BOOST_AUTO_TEST_CASE(dynamic_bitset_small_test)
-{
+BOOST_AUTO_TEST_CASE(dynamic_bitset_small_test) {
    fcl::dynamic_bitset bs1;
    bs1.resize(21);
 
@@ -225,7 +212,6 @@ BOOST_AUTO_TEST_CASE(struct_serialization) {
    fcl::raw::unpack(ds, a2);
    bool same = a == a2;
    BOOST_TEST(same);
-
 }
 
 // Verify std::optional is unpacked correctly, especially an empty optional will always
@@ -234,23 +220,23 @@ BOOST_AUTO_TEST_CASE(unpacking_optional) {
    // source is empty
    char buff[8];
    datastream<char*> ds(buff, sizeof(buff));
-   std::optional<uint32_t> s;  // no value
+   std::optional<uint32_t> s; // no value
    fcl::raw::pack(ds, s);
 
-   {  // target has value. This test used to fail.
+   { // target has value. This test used to fail.
       std::optional<uint32_t> t = 10;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST((s == t));
    }
 
-   {  // target reused for multiple unpackings. This test used to fail.
+   { // target reused for multiple unpackings. This test used to fail.
       char buff[8];
       datastream<char*> ds1(buff, sizeof(buff));
       std::optional<uint32_t> s1 = 15;
       fcl::raw::pack(ds1, s1);
 
-      std::optional<uint32_t> t;  // target is empty initially
+      std::optional<uint32_t> t; // target is empty initially
 
       // Unpacking to t the first time so t has value
       ds1.seekp(0);
@@ -275,7 +261,7 @@ BOOST_AUTO_TEST_CASE(unpacking_optional) {
    ds.seekp(0);
    fcl::raw::pack(ds, s);
 
-   {  // target has value.
+   { // target has value.
       std::optional<uint32_t> t = 10;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -296,17 +282,17 @@ BOOST_AUTO_TEST_CASE(packing_shared_ptr) {
    // source is null
    char buff[8];
    datastream<char*> ds(buff, sizeof(buff));
-   std::shared_ptr<uint32_t> s;  // null_ptr
+   std::shared_ptr<uint32_t> s; // null_ptr
    fcl::raw::pack(ds, s);
 
-   {  // target has value. This test used to fail.
+   { // target has value. This test used to fail.
       std::shared_ptr<uint32_t> t = std::make_shared<uint32_t>(10);
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST(!t);
    }
 
-   {  // target is null.
+   { // target is null.
       std::shared_ptr<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -318,14 +304,14 @@ BOOST_AUTO_TEST_CASE(packing_shared_ptr) {
    s = std::make_shared<uint32_t>(50);
    fcl::raw::pack(ds, s);
 
-   {  // target has value.
+   { // target has value.
       std::shared_ptr<uint32_t> t = std::make_shared<uint32_t>(10);
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST((*s == *t));
    }
 
-   {  // target is null.
+   { // target is null.
       std::shared_ptr<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -339,17 +325,17 @@ BOOST_AUTO_TEST_CASE(packing_set) {
    //==== source empty
    char buff[16];
    datastream<char*> ds(buff, sizeof(buff));
-   std::set<uint32_t> s;  // empty
+   std::set<uint32_t> s; // empty
    fcl::raw::pack(ds, s);
 
-   {  // target is not empty. This test used to fail.
-      std::set<uint32_t> t {10};
+   { // target is not empty. This test used to fail.
+      std::set<uint32_t> t{10};
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST(t.empty());
    }
 
-   {  // target is empty.
+   { // target is empty.
       std::set<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -361,14 +347,14 @@ BOOST_AUTO_TEST_CASE(packing_set) {
    s = {1, 2};
    fcl::raw::pack(ds, s);
 
-   {  // target is not empty. This test used to fail (ending up with {1, 2, 3}).
-      std::set<uint32_t> t {3};
+   { // target is not empty. This test used to fail (ending up with {1, 2, 3}).
+      std::set<uint32_t> t{3};
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST((s == t));
    }
 
-   {  // target is empty.
+   { // target is empty.
       std::set<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -382,17 +368,17 @@ BOOST_AUTO_TEST_CASE(packing_list) {
    //==== source empty
    char buff[16];
    datastream<char*> ds(buff, sizeof(buff));
-   std::list<uint32_t> s;  // empty
+   std::list<uint32_t> s; // empty
    fcl::raw::pack(ds, s);
 
-   {  // target has value. This test used to fail.
-      std::list<uint32_t> t {10};
+   { // target has value. This test used to fail.
+      std::list<uint32_t> t{10};
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST((t.size() == 0));
    }
 
-   {  // target is empty.
+   { // target is empty.
       std::list<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
@@ -404,14 +390,14 @@ BOOST_AUTO_TEST_CASE(packing_list) {
    s = {1, 2};
    fcl::raw::pack(ds, s);
 
-   {  // target is not empty. This test used to fail (ending up with {1, 2, 3}).
-      std::list<uint32_t> t {3};
+   { // target is not empty. This test used to fail (ending up with {1, 2, 3}).
+      std::list<uint32_t> t{3};
       ds.seekp(0);
       fcl::raw::unpack(ds, t);
       BOOST_TEST((s == t));
    }
 
-   {  // target is empty.
+   { // target is empty.
       std::list<uint32_t> t;
       ds.seekp(0);
       fcl::raw::unpack(ds, t);

@@ -38,12 +38,12 @@ enum class engine_error_kind {
 };
 
 class engine_error final : public std::runtime_error {
-public:
+ public:
    engine_error(engine_error_kind kind, std::string message);
 
    [[nodiscard]] engine_error_kind kind() const noexcept;
 
-private:
+ private:
    engine_error_kind kind_;
 };
 
@@ -125,7 +125,7 @@ class engine_connector;
 class engine_listener;
 
 class engine_stream : public std::enable_shared_from_this<engine_stream> {
-public:
+ public:
    struct impl;
 
    engine_stream(const engine_stream&) = delete;
@@ -137,7 +137,7 @@ public:
    boost::asio::awaitable<std::vector<std::uint8_t>> async_read();
    boost::asio::awaitable<void> async_close();
 
-private:
+ private:
    friend class engine_connection;
 
    explicit engine_stream(std::shared_ptr<impl> impl_value);
@@ -146,7 +146,7 @@ private:
 };
 
 class engine_connection : public std::enable_shared_from_this<engine_connection> {
-public:
+ public:
    struct impl;
 
    engine_connection(const engine_connection&) = delete;
@@ -160,7 +160,7 @@ public:
    boost::asio::awaitable<void> async_close();
    void cancel();
 
-private:
+ private:
    friend class engine_connector;
    friend class engine_listener;
    friend class engine_stream;
@@ -171,19 +171,18 @@ private:
 };
 
 class engine_connector {
-public:
+ public:
    explicit engine_connector(boost::asio::io_context& context);
 
-   boost::asio::awaitable<std::shared_ptr<engine_connection>> async_connect(
-      engine_endpoint remote,
-      engine_client_options options);
+   boost::asio::awaitable<std::shared_ptr<engine_connection>> async_connect(engine_endpoint remote,
+                                                                            engine_client_options options);
 
-private:
+ private:
    boost::asio::io_context& context_;
 };
 
 class engine_listener {
-public:
+ public:
    struct impl;
 
    engine_listener(boost::asio::io_context& context, engine_endpoint bind_endpoint, engine_server_options options);
@@ -193,7 +192,7 @@ public:
    boost::asio::awaitable<std::shared_ptr<engine_connection>> async_accept();
    void stop();
 
-private:
+ private:
    std::shared_ptr<impl> impl_;
 };
 

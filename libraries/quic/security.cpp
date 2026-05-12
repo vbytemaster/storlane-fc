@@ -39,7 +39,8 @@ struct x509_deleter {
 };
 
 [[nodiscard]] std::vector<std::uint8_t> der_from_pem_certificate(std::string_view certificate_pem) {
-   auto bio = std::unique_ptr<BIO, bio_deleter>{BIO_new_mem_buf(certificate_pem.data(), static_cast<int>(certificate_pem.size()))};
+   auto bio = std::unique_ptr<BIO, bio_deleter>{
+       BIO_new_mem_buf(certificate_pem.data(), static_cast<int>(certificate_pem.size()))};
    if (!bio) {
       throw_quic_error(error_kind::tls_failed, "failed to allocate certificate BIO");
    }
@@ -100,9 +101,8 @@ bool verify_peer_certificate(const peer_certificate& certificate, const security
       return true;
    }
 
-   const auto actual = normalize_sha256_fingerprint(certificate.sha256_fingerprint.empty()
-                                                       ? sha256_fingerprint(certificate.der)
-                                                       : certificate.sha256_fingerprint);
+   const auto actual = normalize_sha256_fingerprint(
+       certificate.sha256_fingerprint.empty() ? sha256_fingerprint(certificate.der) : certificate.sha256_fingerprint);
    if (options.expected_sha256_fingerprint) {
       if (actual != normalize_sha256_fingerprint(*options.expected_sha256_fingerprint)) {
          return false;

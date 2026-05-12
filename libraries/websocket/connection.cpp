@@ -42,7 +42,7 @@ using stream_variant = std::variant<plain_stream, tls_stream>;
 
 struct completion_state {
    explicit completion_state(asio::any_io_executor executor)
-      : timer(std::move(executor), (std::chrono::steady_clock::time_point::max)()) {}
+       : timer(std::move(executor), (std::chrono::steady_clock::time_point::max)()) {}
 
    void complete() {
       {
@@ -96,18 +96,13 @@ struct write_operation {
 } // namespace
 
 struct connection::impl {
-   explicit impl(beast::tcp_stream stream_value)
-      : stream(plain_stream{std::move(stream_value)}) {}
+   explicit impl(beast::tcp_stream stream_value) : stream(plain_stream{std::move(stream_value)}) {}
 
-   explicit impl(beast::ssl_stream<beast::tcp_stream> stream_value)
-      : stream(tls_stream{std::move(stream_value)}) {}
+   explicit impl(beast::ssl_stream<beast::tcp_stream> stream_value) : stream(tls_stream{std::move(stream_value)}) {}
 
    [[nodiscard]] asio::any_io_executor executor() {
-      return std::visit(
-         [](auto& stream_value) -> asio::any_io_executor {
-            return stream_value.get_executor();
-         },
-         stream);
+      return std::visit([](auto& stream_value) -> asio::any_io_executor { return stream_value.get_executor(); },
+                        stream);
    }
 
    void complete_pending_with_error(std::exception_ptr error) {
@@ -128,55 +123,55 @@ struct connection::impl {
       auto operation = writes.front();
       auto self = owner.shared_from_this();
       std::visit(
-         [this, self, operation](auto& stream_value) {
-            stream_value.async_write(
-               asio::buffer(operation->message),
-               asio::bind_executor(
-                  stream_value.get_executor(),
-                  [this, self, operation](boost::system::error_code error, std::size_t bytes) {
-                     static_cast<void>(bytes);
-                     writes.pop_front();
-                     writing = false;
-                     if (error) {
-                        operation->completion->complete_error(
-                           std::make_exception_ptr(boost::system::system_error{error}));
-                        record_failed_write();
-                        complete_pending_with_error(std::make_exception_ptr(boost::system::system_error{error}));
-                        return;
-                     }
+          [this, self, operation](auto& stream_value) {
+             stream_value.async_write(
+                 asio::buffer(operation->message),
+                 asio::bind_executor(stream_value.get_executor(),
+                                     [this, self, operation](boost::system::error_code error, std::size_t bytes) {
+                                        static_cast<void>(bytes);
+                                        writes.pop_front();
+                                        writing = false;
+                                        if (error) {
+                                           operation->completion->complete_error(
+                                               std::make_exception_ptr(boost::system::system_error{error}));
+                                           record_failed_write();
+                                           complete_pending_with_error(
+                                               std::make_exception_ptr(boost::system::system_error{error}));
+                                           return;
+                                        }
 
-                     record_sent();
-                     operation->completion->complete();
-                     start_write(*self);
-                  }));
-         },
-         stream);
+                                        record_sent();
+                                        operation->completion->complete();
+                                        start_write(*self);
+                                     }));
+          },
+          stream);
    }
 
    asio::awaitable<void> accept(const boost::beast::http::request<boost::beast::http::string_body>& request_value) {
       co_await std::visit(
-         [&request_value](auto& stream_value) -> asio::awaitable<void> {
-            stream_value.set_option(beast_websocket::stream_base::timeout::suggested(beast::role_type::server));
-            co_await stream_value.async_accept(request_value, use_awaitable);
-         },
-         stream);
+          [&request_value](auto& stream_value) -> asio::awaitable<void> {
+             stream_value.set_option(beast_websocket::stream_base::timeout::suggested(beast::role_type::server));
+             co_await stream_value.async_accept(request_value, use_awaitable);
+          },
+          stream);
    }
 
    asio::awaitable<void> handshake(std::string host, std::string target) {
       co_await std::visit(
-         [&host, &target](auto& stream_value) -> asio::awaitable<void> {
-            stream_value.set_option(beast_websocket::stream_base::timeout::suggested(beast::role_type::client));
-            co_await stream_value.async_handshake(host, target, use_awaitable);
-         },
-         stream);
+          [&host, &target](auto& stream_value) -> asio::awaitable<void> {
+             stream_value.set_option(beast_websocket::stream_base::timeout::suggested(beast::role_type::client));
+             co_await stream_value.async_handshake(host, target, use_awaitable);
+          },
+          stream);
    }
 
    asio::awaitable<std::pair<boost::system::error_code, std::size_t>> read_one() {
       co_return co_await std::visit(
-         [this](auto& stream_value) -> asio::awaitable<std::pair<boost::system::error_code, std::size_t>> {
-            co_return co_await stream_value.async_read(buffer, asio::as_tuple(use_awaitable));
-         },
-         stream);
+          [this](auto& stream_value) -> asio::awaitable<std::pair<boost::system::error_code, std::size_t>> {
+             co_return co_await stream_value.async_read(buffer, asio::as_tuple(use_awaitable));
+          },
+          stream);
    }
 
    void record_queued_write() {
@@ -234,11 +229,10 @@ struct connection::impl {
    bool closing = false;
 };
 
-connection::connection(beast::tcp_stream stream)
-   : impl_(std::make_unique<impl>(std::move(stream))) {}
+connection::connection(beast::tcp_stream stream) : impl_(std::make_unique<impl>(std::move(stream))) {}
 
 connection::connection(beast::ssl_stream<beast::tcp_stream> stream)
-   : impl_(std::make_unique<impl>(std::move(stream))) {}
+    : impl_(std::make_unique<impl>(std::move(stream))) {}
 
 connection::~connection() = default;
 
@@ -251,97 +245,82 @@ connection::ptr connection::create(beast::ssl_stream<beast::tcp_stream> stream) 
 }
 
 void connection::on_message(message_handler handler) {
-   asio::post(
-      impl_->executor(),
-      [impl = impl_.get(), handler = std::move(handler)]() mutable {
-         impl->on_message = std::move(handler);
-      });
+   asio::post(impl_->executor(),
+              [impl = impl_.get(), handler = std::move(handler)]() mutable { impl->on_message = std::move(handler); });
 }
 
 void connection::on_close(close_handler handler) {
-   asio::post(
-      impl_->executor(),
-      [impl = impl_.get(), handler = std::move(handler)]() mutable {
-         impl->on_close = std::move(handler);
-      });
+   asio::post(impl_->executor(),
+              [impl = impl_.get(), handler = std::move(handler)]() mutable { impl->on_close = std::move(handler); });
 }
 
 boost::asio::awaitable<void> connection::send(std::string message) {
    auto completion = std::make_shared<completion_state>(impl_->executor());
-   asio::post(
-      impl_->executor(),
-      [self = shared_from_this(), message = std::move(message), completion]() mutable {
-         if (self->impl_->closing) {
-            completion->complete_error(std::make_exception_ptr(std::runtime_error{"websocket connection is closing"}));
-            return;
-         }
-         self->impl_->writes.push_back(std::make_shared<write_operation>(write_operation{
-            .message = std::move(message),
-            .completion = std::move(completion),
-         }));
-         self->impl_->record_queued_write();
-         self->impl_->start_write(*self);
-      });
+   asio::post(impl_->executor(), [self = shared_from_this(), message = std::move(message), completion]() mutable {
+      if (self->impl_->closing) {
+         completion->complete_error(std::make_exception_ptr(std::runtime_error{"websocket connection is closing"}));
+         return;
+      }
+      self->impl_->writes.push_back(std::make_shared<write_operation>(write_operation{
+          .message = std::move(message),
+          .completion = std::move(completion),
+      }));
+      self->impl_->record_queued_write();
+      self->impl_->start_write(*self);
+   });
    co_await wait_completion(completion);
 }
 
 boost::asio::awaitable<void> connection::close() {
    auto completion = std::make_shared<completion_state>(impl_->executor());
-   asio::post(
-      impl_->executor(),
-      [self = shared_from_this(), completion]() {
-         if (self->impl_->closing) {
-            completion->complete();
-            return;
-         }
+   asio::post(impl_->executor(), [self = shared_from_this(), completion]() {
+      if (self->impl_->closing) {
+         completion->complete();
+         return;
+      }
 
-         self->impl_->closing = true;
-         std::visit(
-            [self, completion](auto& stream_value) {
-               stream_value.async_close(
-                  beast_websocket::close_code::normal,
-                  asio::bind_executor(
-                     stream_value.get_executor(),
-                     [self, completion](boost::system::error_code error) {
-                        if (error) {
-                           completion->complete_error(std::make_exception_ptr(boost::system::system_error{error}));
-                           return;
-                        }
-                        self->impl_->record_close();
-                        completion->complete();
-                     }));
-            },
-            self->impl_->stream);
-      });
+      self->impl_->closing = true;
+      std::visit(
+          [self, completion](auto& stream_value) {
+             stream_value.async_close(
+                 beast_websocket::close_code::normal,
+                 asio::bind_executor(stream_value.get_executor(), [self, completion](boost::system::error_code error) {
+                    if (error) {
+                       completion->complete_error(std::make_exception_ptr(boost::system::system_error{error}));
+                       return;
+                    }
+                    self->impl_->record_close();
+                    completion->complete();
+                 }));
+          },
+          self->impl_->stream);
+   });
    co_await wait_completion(completion);
 }
 
 boost::asio::awaitable<void> connection::ping(std::string payload) {
    auto completion = std::make_shared<completion_state>(impl_->executor());
-   asio::post(
-      impl_->executor(),
-      [self = shared_from_this(), payload = std::move(payload), completion]() {
-         std::visit(
-            [self, payload, completion](auto& stream_value) {
-               stream_value.async_ping(
-                  beast_websocket::ping_data{payload},
-                  asio::bind_executor(
-                     stream_value.get_executor(),
-                     [self, completion](boost::system::error_code error) {
-                        if (error) {
-                           completion->complete_error(std::make_exception_ptr(boost::system::system_error{error}));
-                           return;
-                        }
-                        self->impl_->record_ping();
-                        completion->complete();
-                     }));
-            },
-            self->impl_->stream);
-      });
+   asio::post(impl_->executor(), [self = shared_from_this(), payload = std::move(payload), completion]() {
+      std::visit(
+          [self, payload, completion](auto& stream_value) {
+             stream_value.async_ping(
+                 beast_websocket::ping_data{payload},
+                 asio::bind_executor(stream_value.get_executor(), [self, completion](boost::system::error_code error) {
+                    if (error) {
+                       completion->complete_error(std::make_exception_ptr(boost::system::system_error{error}));
+                       return;
+                    }
+                    self->impl_->record_ping();
+                    completion->complete();
+                 }));
+          },
+          self->impl_->stream);
+   });
    co_await wait_completion(completion);
 }
 
-boost::asio::awaitable<void> connection::accept(const boost::beast::http::request<boost::beast::http::string_body>& request_value) {
+boost::asio::awaitable<void>
+connection::accept(const boost::beast::http::request<boost::beast::http::string_body>& request_value) {
    co_await impl_->accept(request_value);
 }
 
@@ -352,27 +331,27 @@ boost::asio::awaitable<void> connection::handshake(std::string host, std::string
 void connection::start_read_loop() {
    auto self = shared_from_this();
    asio::co_spawn(
-      impl_->executor(),
-      [self]() -> asio::awaitable<void> {
-         for (;;) {
-            auto [error, bytes] = co_await self->impl_->read_one();
-            static_cast<void>(bytes);
-            if (error) {
-               if (self->impl_->on_close) {
-                  self->impl_->on_close(*self);
-               }
-               co_return;
-            }
+       impl_->executor(),
+       [self]() -> asio::awaitable<void> {
+          for (;;) {
+             auto [error, bytes] = co_await self->impl_->read_one();
+             static_cast<void>(bytes);
+             if (error) {
+                if (self->impl_->on_close) {
+                   self->impl_->on_close(*self);
+                }
+                co_return;
+             }
 
-            auto message = beast::buffers_to_string(self->impl_->buffer.data());
-            self->impl_->buffer.consume(self->impl_->buffer.size());
-            self->impl_->record_received();
-            if (self->impl_->on_message) {
-               co_await self->impl_->on_message(*self, std::move(message));
-            }
-         }
-      },
-      [](std::exception_ptr) {});
+             auto message = beast::buffers_to_string(self->impl_->buffer.data());
+             self->impl_->buffer.consume(self->impl_->buffer.size());
+             self->impl_->record_received();
+             if (self->impl_->on_message) {
+                co_await self->impl_->on_message(*self, std::move(message));
+             }
+          }
+       },
+       [](std::exception_ptr) {});
 }
 
 connection_metrics connection::metrics() const {

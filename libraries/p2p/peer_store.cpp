@@ -13,19 +13,17 @@ module fcl.p2p.peer_store;
 namespace fcl::p2p {
 namespace {
 
-[[nodiscard]] bool same_endpoint(
-   const fcl::quic::endpoint& left,
-   const fcl::quic::endpoint& right) {
+[[nodiscard]] bool same_endpoint(const fcl::quic::endpoint& left, const fcl::quic::endpoint& right) {
    return left.host == right.host && left.port == right.port;
 }
 
 void refresh_endpoint_score(peer_endpoint_record& endpoint) {
    endpoint.score = score_path(path_observation{
-      .kind = endpoint.kind,
-      .latency = endpoint.last_latency,
-      .failures = endpoint.failures,
-      .successes = endpoint.successes,
-      .last_success = endpoint.successes > 0 && endpoint.failures == 0,
+       .kind = endpoint.kind,
+       .latency = endpoint.last_latency,
+       .failures = endpoint.failures,
+       .successes = endpoint.successes,
+       .last_success = endpoint.successes > 0 && endpoint.failures == 0,
    });
 }
 
@@ -46,8 +44,7 @@ struct peer_store::impl {
    std::map<peer_id, peer_record> records;
 };
 
-peer_store::peer_store()
-   : impl_(std::make_shared<impl>()) {}
+peer_store::peer_store() : impl_(std::make_shared<impl>()) {}
 
 peer_store::~peer_store() = default;
 peer_store::peer_store(peer_store&&) noexcept = default;
@@ -56,11 +53,11 @@ peer_store& peer_store::operator=(peer_store&&) noexcept = default;
 void peer_store::upsert(peer_record record) {
    auto lock = std::scoped_lock{impl_->mutex};
    record.score = score_path(path_observation{
-      .kind = record.endpoints.empty() ? path_kind::direct : record.endpoints.front().kind,
-      .latency = record.last_latency,
-      .failures = record.failures,
-      .successes = record.successes,
-      .last_success = record.successes > 0,
+       .kind = record.endpoints.empty() ? path_kind::direct : record.endpoints.front().kind,
+       .latency = record.last_latency,
+       .failures = record.failures,
+       .successes = record.successes,
+       .last_success = record.successes > 0,
    });
    impl_->records[record.peer] = std::move(record);
 }
@@ -80,7 +77,8 @@ void peer_store::learn_endpoint(peer_id peer, fcl::quic::endpoint endpoint, capa
    }
 }
 
-void peer_store::mark_reachability(peer_id peer, reachability_state state, std::optional<fcl::quic::endpoint> observed) {
+void peer_store::mark_reachability(peer_id peer, reachability_state state,
+                                   std::optional<fcl::quic::endpoint> observed) {
    auto lock = std::scoped_lock{impl_->mutex};
    auto& record = impl_->records[peer];
    record.peer = std::move(peer);
@@ -96,11 +94,11 @@ void peer_store::mark_success(const peer_id& peer, path_kind kind, std::chrono::
    ++record.successes;
    record.last_latency = latency;
    record.score = score_path(path_observation{
-      .kind = kind,
-      .latency = latency,
-      .failures = record.failures,
-      .successes = record.successes,
-      .last_success = true,
+       .kind = kind,
+       .latency = latency,
+       .failures = record.failures,
+       .successes = record.successes,
+       .last_success = true,
    });
 }
 
@@ -110,27 +108,24 @@ void peer_store::mark_failure(const peer_id& peer) {
    record.peer = peer;
    ++record.failures;
    record.score = score_path(path_observation{
-      .kind = record.endpoints.empty() ? path_kind::direct : record.endpoints.front().kind,
-      .latency = record.last_latency,
-      .failures = record.failures,
-      .successes = record.successes,
-      .last_success = false,
+       .kind = record.endpoints.empty() ? path_kind::direct : record.endpoints.front().kind,
+       .latency = record.last_latency,
+       .failures = record.failures,
+       .successes = record.successes,
+       .last_success = false,
    });
 }
 
-void peer_store::mark_endpoint_success(
-   const peer_id& peer,
-   const fcl::quic::endpoint& endpoint,
-   path_kind kind,
-   std::chrono::milliseconds latency) {
+void peer_store::mark_endpoint_success(const peer_id& peer, const fcl::quic::endpoint& endpoint, path_kind kind,
+                                       std::chrono::milliseconds latency) {
    auto lock = std::scoped_lock{impl_->mutex};
    auto& record = impl_->records[peer];
    record.peer = peer;
-   auto iterator = std::ranges::find_if(record.endpoints, [&](const auto& current) {
-      return same_endpoint(current.endpoint, endpoint);
-   });
+   auto iterator = std::ranges::find_if(record.endpoints,
+                                        [&](const auto& current) { return same_endpoint(current.endpoint, endpoint); });
    if (iterator == record.endpoints.end()) {
-      iterator = record.endpoints.insert(record.endpoints.end(), peer_endpoint_record{.endpoint = endpoint, .kind = kind});
+      iterator =
+          record.endpoints.insert(record.endpoints.end(), peer_endpoint_record{.endpoint = endpoint, .kind = kind});
    }
    iterator->kind = kind;
    iterator->last_latency = latency;
@@ -140,27 +135,24 @@ void peer_store::mark_endpoint_success(
    ++record.successes;
    record.last_latency = latency;
    record.score = score_path(path_observation{
-      .kind = kind,
-      .latency = latency,
-      .failures = record.failures,
-      .successes = record.successes,
-      .last_success = true,
+       .kind = kind,
+       .latency = latency,
+       .failures = record.failures,
+       .successes = record.successes,
+       .last_success = true,
    });
 }
 
-void peer_store::mark_endpoint_failure(
-   const peer_id& peer,
-   const fcl::quic::endpoint& endpoint,
-   path_kind kind,
-   std::chrono::steady_clock::time_point backoff_until) {
+void peer_store::mark_endpoint_failure(const peer_id& peer, const fcl::quic::endpoint& endpoint, path_kind kind,
+                                       std::chrono::steady_clock::time_point backoff_until) {
    auto lock = std::scoped_lock{impl_->mutex};
    auto& record = impl_->records[peer];
    record.peer = peer;
-   auto iterator = std::ranges::find_if(record.endpoints, [&](const auto& current) {
-      return same_endpoint(current.endpoint, endpoint);
-   });
+   auto iterator = std::ranges::find_if(record.endpoints,
+                                        [&](const auto& current) { return same_endpoint(current.endpoint, endpoint); });
    if (iterator == record.endpoints.end()) {
-      iterator = record.endpoints.insert(record.endpoints.end(), peer_endpoint_record{.endpoint = endpoint, .kind = kind});
+      iterator =
+          record.endpoints.insert(record.endpoints.end(), peer_endpoint_record{.endpoint = endpoint, .kind = kind});
    }
    iterator->kind = kind;
    iterator->backoff_until = backoff_until;
@@ -168,11 +160,11 @@ void peer_store::mark_endpoint_failure(
    refresh_endpoint_score(*iterator);
    ++record.failures;
    record.score = score_path(path_observation{
-      .kind = kind,
-      .latency = record.last_latency,
-      .failures = record.failures,
-      .successes = record.successes,
-      .last_success = false,
+       .kind = kind,
+       .latency = record.last_latency,
+       .failures = record.failures,
+       .successes = record.successes,
+       .last_success = false,
    });
 }
 

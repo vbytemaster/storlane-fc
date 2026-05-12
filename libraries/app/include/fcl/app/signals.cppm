@@ -17,7 +17,7 @@ struct plugin_signal {
 };
 
 class signal_bus {
-public:
+ public:
    boost::signals2::signal<void(const application_signal&)> application_initializing;
    boost::signals2::signal<void(const application_signal&)> application_initialized;
    boost::signals2::signal<void(const application_signal&)> application_starting;

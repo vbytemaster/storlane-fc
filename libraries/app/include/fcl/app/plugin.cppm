@@ -33,7 +33,7 @@ struct plugin_config {
 };
 
 class plugin {
-public:
+ public:
    virtual ~plugin() = default;
 
    [[nodiscard]] virtual plugin_id id() const = 0;

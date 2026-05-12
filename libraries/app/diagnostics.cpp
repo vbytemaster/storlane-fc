@@ -17,8 +17,7 @@ struct diagnostics_store::impl {
    std::vector<plugin_diagnostics> plugins;
 };
 
-diagnostics_store::diagnostics_store()
-   : impl_{std::make_shared<impl>()} {}
+diagnostics_store::diagnostics_store() : impl_{std::make_shared<impl>()} {}
 
 diagnostics_store::~diagnostics_store() = default;
 
@@ -29,12 +28,8 @@ void diagnostics_store::set_application_state(lifecycle_state state, std::string
    impl_->last_error = std::move(error);
 }
 
-void diagnostics_store::set_plugin_state(
-   std::string id,
-   std::string version,
-   lifecycle_state state,
-   std::string transition,
-   std::string error) {
+void diagnostics_store::set_plugin_state(std::string id, std::string version, lifecycle_state state,
+                                         std::string transition, std::string error) {
    const auto lock = std::scoped_lock{impl_->mutex};
    for (auto& plugin : impl_->plugins) {
       if (plugin.id == id) {
@@ -46,11 +41,11 @@ void diagnostics_store::set_plugin_state(
       }
    }
    impl_->plugins.push_back(plugin_diagnostics{
-      .id = std::move(id),
-      .version = std::move(version),
-      .state = state,
-      .last_transition = std::move(transition),
-      .last_error = std::move(error),
+       .id = std::move(id),
+       .version = std::move(version),
+       .state = state,
+       .last_transition = std::move(transition),
+       .last_error = std::move(error),
    });
 }
 

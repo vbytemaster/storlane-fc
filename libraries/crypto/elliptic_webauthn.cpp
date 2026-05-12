@@ -31,14 +31,10 @@ struct client_data_fields {
 };
 
 class client_data_json_reader {
-public:
-   explicit client_data_json_reader(std::string_view input)
-      : _input(input)
-   {
-   }
+ public:
+   explicit client_data_json_reader(std::string_view input) : _input(input) {}
 
-   client_data_fields parse()
-   {
+   client_data_fields parse() {
       auto fields = client_data_fields{};
       skip_ws();
       parse_top_object(fields);
@@ -49,9 +45,8 @@ public:
       return fields;
    }
 
-private:
-   void parse_top_object(client_data_fields& fields)
-   {
+ private:
+   void parse_top_object(client_data_fields& fields) {
       expect('{');
       skip_ws();
       if (consume('}')) {
@@ -83,16 +78,14 @@ private:
       }
    }
 
-   std::string parse_required_string(std::string_view field)
-   {
+   std::string parse_required_string(std::string_view field) {
       if (!peek('"')) {
          fail("expected string value for field " + std::string(field));
       }
       return parse_string();
    }
 
-   void skip_value()
-   {
+   void skip_value() {
       skip_ws();
       if (peek('"')) {
          (void)parse_string();
@@ -109,8 +102,7 @@ private:
       }
    }
 
-   void skip_object_body()
-   {
+   void skip_object_body() {
       skip_ws();
       if (consume('}')) {
          return;
@@ -129,8 +121,7 @@ private:
       }
    }
 
-   void skip_array_body()
-   {
+   void skip_array_body() {
       skip_ws();
       if (consume(']')) {
          return;
@@ -145,8 +136,7 @@ private:
       }
    }
 
-   void skip_number()
-   {
+   void skip_number() {
       if (consume('-') && !peek_digit()) {
          fail("invalid JSON number");
       }
@@ -175,8 +165,7 @@ private:
       }
    }
 
-   std::string parse_string()
-   {
+   std::string parse_string() {
       expect('"');
       auto out = std::string{};
       while (_pos < _input.size()) {
@@ -196,24 +185,41 @@ private:
          }
          const auto escaped = _input[_pos++];
          switch (escaped) {
-            case '"': out.push_back('"'); break;
-            case '\\': out.push_back('\\'); break;
-            case '/': out.push_back('/'); break;
-            case 'b': out.push_back('\b'); break;
-            case 'f': out.push_back('\f'); break;
-            case 'n': out.push_back('\n'); break;
-            case 'r': out.push_back('\r'); break;
-            case 't': out.push_back('\t'); break;
-            case 'u': append_unicode_escape(out); break;
-            default:
-               fail("invalid JSON escape");
+         case '"':
+            out.push_back('"');
+            break;
+         case '\\':
+            out.push_back('\\');
+            break;
+         case '/':
+            out.push_back('/');
+            break;
+         case 'b':
+            out.push_back('\b');
+            break;
+         case 'f':
+            out.push_back('\f');
+            break;
+         case 'n':
+            out.push_back('\n');
+            break;
+         case 'r':
+            out.push_back('\r');
+            break;
+         case 't':
+            out.push_back('\t');
+            break;
+         case 'u':
+            append_unicode_escape(out);
+            break;
+         default:
+            fail("invalid JSON escape");
          }
       }
       fail("unterminated JSON string");
    }
 
-   void append_unicode_escape(std::string& out)
-   {
+   void append_unicode_escape(std::string& out) {
       auto codepoint = parse_hex_quad();
       if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
          if (!consume('\\') || !consume('u')) {
@@ -230,8 +236,7 @@ private:
       append_utf8(out, codepoint);
    }
 
-   std::uint32_t parse_hex_quad()
-   {
+   std::uint32_t parse_hex_quad() {
       auto value = std::uint32_t{0};
       for (auto i = 0; i < 4; ++i) {
          if (_pos >= _input.size()) {
@@ -242,8 +247,7 @@ private:
       return value;
    }
 
-   static void append_utf8(std::string& out, std::uint32_t codepoint)
-   {
+   static void append_utf8(std::string& out, std::uint32_t codepoint) {
       if (codepoint <= 0x7F) {
          out.push_back(static_cast<char>(codepoint));
       } else if (codepoint <= 0x7FF) {
@@ -261,8 +265,7 @@ private:
       }
    }
 
-   static std::uint32_t hex_value(char ch)
-   {
+   static std::uint32_t hex_value(char ch) {
       if (ch >= '0' && ch <= '9') {
          return static_cast<std::uint32_t>(ch - '0');
       }
@@ -275,8 +278,7 @@ private:
       throw std::invalid_argument{"invalid hex digit"};
    }
 
-   bool consume(char expected)
-   {
+   bool consume(char expected) {
       if (peek(expected)) {
          ++_pos;
          return true;
@@ -284,8 +286,7 @@ private:
       return false;
    }
 
-   bool consume_literal(std::string_view literal)
-   {
+   bool consume_literal(std::string_view literal) {
       if (_input.substr(_pos, literal.size()) == literal) {
          _pos += literal.size();
          return true;
@@ -293,8 +294,7 @@ private:
       return false;
    }
 
-   void expect(char expected)
-   {
+   void expect(char expected) {
       if (!consume(expected)) {
          auto message = std::string{"expected '"};
          message.push_back(expected);
@@ -303,45 +303,36 @@ private:
       }
    }
 
-   bool peek(char expected) const
-   {
+   bool peek(char expected) const {
       return _pos < _input.size() && _input[_pos] == expected;
    }
 
-   bool peek_digit() const
-   {
+   bool peek_digit() const {
       return _pos < _input.size() && std::isdigit(static_cast<unsigned char>(_input[_pos])) != 0;
    }
 
-   void require_digit()
-   {
+   void require_digit() {
       if (!peek_digit()) {
          fail("expected digit");
       }
       ++_pos;
    }
 
-   void skip_ws()
-   {
+   void skip_ws() {
       while (_pos < _input.size() && std::isspace(static_cast<unsigned char>(_input[_pos])) != 0) {
          ++_pos;
       }
    }
 
-   [[noreturn]] void fail(const std::string& reason) const
-   {
-      FCL_THROW(
-         "Failed to parse client data JSON",
-         fcl::error::ctx("reason", reason),
-         fcl::error::ctx("offset", _pos));
+   [[noreturn]] void fail(const std::string& reason) const {
+      FCL_THROW("Failed to parse client data JSON", fcl::error::ctx("reason", reason), fcl::error::ctx("offset", _pos));
    }
 
    std::string_view _input;
    std::size_t _pos = 0;
 };
 
-client_data_fields parse_client_data_json(std::string_view input)
-{
+client_data_fields parse_client_data_json(std::string_view input) {
    try {
       return client_data_json_reader{input}.parse();
    } catch (const std::invalid_argument& e) {
@@ -350,7 +341,6 @@ client_data_fields parse_client_data_json(std::string_view input)
 }
 
 } // namespace detail
-
 
 public_key::public_key(const signature& c, const fcl::sha256& digest, bool) {
    const auto client_data = detail::parse_client_data_json(c.client_json);
@@ -362,21 +352,23 @@ public_key::public_key(const signature& c, const fcl::sha256& digest, bool) {
 
    char required_origin_scheme[] = "https://";
    size_t https_len = strlen(required_origin_scheme);
-   FCL_ASSERT(client_data.origin.compare(0, https_len, required_origin_scheme) == 0, "webauthn origin must begin with https://");
+   FCL_ASSERT(client_data.origin.compare(0, https_len, required_origin_scheme) == 0,
+              "webauthn origin must begin with https://");
    rpid = client_data.origin.substr(https_len, client_data.origin.rfind(':') - https_len);
 
    constexpr static size_t min_auth_data_size = 37;
    FCL_ASSERT(c.auth_data.size() >= min_auth_data_size, "auth_data not as large as required");
-   if(c.auth_data[32] & 0x01)
+   if (c.auth_data[32] & 0x01)
       user_verification_type = user_presence_t::USER_PRESENCE_PRESENT;
-   if(c.auth_data[32] & 0x04)
+   if (c.auth_data[32] & 0x04)
       user_verification_type = user_presence_t::USER_PRESENCE_VERIFIED;
 
    static_assert(min_auth_data_size >= sizeof(fcl::sha256), "auth_data min size not enough to store a sha256");
-   FCL_ASSERT(memcmp(c.auth_data.data(), fcl::sha256::hash(rpid).data(), sizeof(fcl::sha256)) == 0, "webauthn rpid hash doesn't match origin");
+   FCL_ASSERT(memcmp(c.auth_data.data(), fcl::sha256::hash(rpid).data(), sizeof(fcl::sha256)) == 0,
+              "webauthn rpid hash doesn't match origin");
 
-   //the signature (and thus public key we need to return) will be over
-   // sha256(auth_data || client_data_hash)
+   // the signature (and thus public key we need to return) will be over
+   //  sha256(auth_data || client_data_hash)
    fcl::sha256 client_data_hash = fcl::sha256::hash(c.client_json);
    fcl::sha256::encoder e;
    e.write((char*)c.auth_data.data(), c.auth_data.size());
@@ -384,7 +376,7 @@ public_key::public_key(const signature& c, const fcl::sha256& digest, bool) {
    fcl::sha256 signed_digest = e.result();
 
    int nV = c.compact_signature.data()[0];
-   if (nV<31 || nV>=35)
+   if (nV < 31 || nV >= 35)
       FCL_THROW("unable to reconstruct public key from signature");
    public_key_data = r1::recover_public_key_data(c.compact_signature, signed_digest, false);
 }

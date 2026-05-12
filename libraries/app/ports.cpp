@@ -6,8 +6,7 @@ module fcl.app.ports;
 
 namespace fcl::app {
 
-port_error::port_error(std::string message)
-   : std::runtime_error(std::move(message)) {}
+port_error::port_error(std::string message) : std::runtime_error(std::move(message)) {}
 
 port_registry::port_registry() = default;
 port_registry::~port_registry() = default;

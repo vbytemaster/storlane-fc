@@ -35,11 +35,9 @@ using asio::awaitable;
 using asio::use_awaitable;
 
 class server_session : public std::enable_shared_from_this<server_session> {
-public:
+ public:
    server_session(beast::tcp_stream stream, server_handler handler, std::shared_ptr<router> router_value)
-      : stream_(std::move(stream))
-      , handler_(std::move(handler))
-      , router_(std::move(router_value)) {}
+       : stream_(std::move(stream)), handler_(std::move(handler)), router_(std::move(router_value)) {}
 
    awaitable<void> run() {
       auto self = shared_from_this();
@@ -49,7 +47,7 @@ public:
          buffer_.consume(buffer_.size());
          auto request_value = request{};
          auto [read_error, bytes] =
-            co_await beast_http::async_read(stream_, buffer_, request_value, asio::as_tuple(use_awaitable));
+             co_await beast_http::async_read(stream_, buffer_, request_value, asio::as_tuple(use_awaitable));
          static_cast<void>(bytes);
 
          if (read_error == asio::error::eof) {
@@ -71,7 +69,7 @@ public:
             response_value.version(request_value.version());
             response_value.keep_alive(false);
             auto [write_error, written] =
-               co_await beast_http::async_write(stream_, response_value, asio::as_tuple(use_awaitable));
+                co_await beast_http::async_write(stream_, response_value, asio::as_tuple(use_awaitable));
             static_cast<void>(written);
             if (write_error) {
                throw boost::system::system_error{write_error};
@@ -90,7 +88,7 @@ public:
          response_value.keep_alive(request_value.keep_alive());
 
          auto [write_error, written] =
-            co_await beast_http::async_write(stream_, response_value, asio::as_tuple(use_awaitable));
+             co_await beast_http::async_write(stream_, response_value, asio::as_tuple(use_awaitable));
          static_cast<void>(written);
          if (write_error) {
             throw boost::system::system_error{write_error};
@@ -104,7 +102,7 @@ public:
       stream_.socket().shutdown(tcp::socket::shutdown_send, ignored);
    }
 
-private:
+ private:
    route_context make_context(const request& request_value) const {
       try {
          return make_route_context(request_value);
@@ -158,12 +156,10 @@ using asio::awaitable;
 using asio::use_awaitable;
 
 struct server::impl {
-   impl(fcl::asio::runtime& runtime_value, server_config config_value, server_handler handler_value, std::shared_ptr<router> router_value)
-      : runtime(runtime_value)
-      , config(std::move(config_value))
-      , handler(std::move(handler_value))
-      , router_value(std::move(router_value))
-      , acceptor(asio::make_strand(runtime.context())) {}
+   impl(fcl::asio::runtime& runtime_value, server_config config_value, server_handler handler_value,
+        std::shared_ptr<router> router_value)
+       : runtime(runtime_value), config(std::move(config_value)), handler(std::move(handler_value)),
+         router_value(std::move(router_value)), acceptor(asio::make_strand(runtime.context())) {}
 
    awaitable<void> accept_loop() {
       for (;;) {
@@ -177,21 +173,16 @@ struct server::impl {
             throw boost::system::system_error{error};
          }
 
-         auto client = std::make_shared<detail::server_session>(
-            beast::tcp_stream{std::move(socket)},
-            handler,
-            router_value);
-         asio::co_spawn(
-            session_strand,
-            client->run(),
-            [](std::exception_ptr error) {
-               if (error) {
-                  try {
-                     std::rethrow_exception(error);
-                  } catch (const std::exception&) {
-                  }
+         auto client =
+             std::make_shared<detail::server_session>(beast::tcp_stream{std::move(socket)}, handler, router_value);
+         asio::co_spawn(session_strand, client->run(), [](std::exception_ptr error) {
+            if (error) {
+               try {
+                  std::rethrow_exception(error);
+               } catch (const std::exception&) {
                }
-            });
+            }
+         });
       }
    }
 
@@ -204,14 +195,11 @@ struct server::impl {
 };
 
 server::server(fcl::asio::runtime& runtime, server_config config, server_handler handler)
-   : impl_(std::make_unique<impl>(runtime, std::move(config), std::move(handler), nullptr)) {}
+    : impl_(std::make_unique<impl>(runtime, std::move(config), std::move(handler), nullptr)) {}
 
 server::server(fcl::asio::runtime& runtime, server_config config, router router_value)
-   : impl_(std::make_unique<impl>(
-        runtime,
-        std::move(config),
-        server_handler{},
-        std::make_shared<router>(std::move(router_value)))) {}
+    : impl_(std::make_unique<impl>(runtime, std::move(config), server_handler{},
+                                   std::make_shared<router>(std::move(router_value)))) {}
 
 server::~server() {
    stop();
@@ -222,30 +210,25 @@ void server::start() {
       return;
    }
 
-   asio::dispatch(
-      impl_->acceptor.get_executor(),
-      [impl = impl_.get()] {
-         const auto address = asio::ip::make_address(impl->config.bind_address);
-         auto endpoint = tcp::endpoint{address, impl->config.port};
+   asio::dispatch(impl_->acceptor.get_executor(), [impl = impl_.get()] {
+      const auto address = asio::ip::make_address(impl->config.bind_address);
+      auto endpoint = tcp::endpoint{address, impl->config.port};
 
-         impl->acceptor.open(endpoint.protocol());
-         impl->acceptor.set_option(asio::socket_base::reuse_address(true));
-         impl->acceptor.bind(endpoint);
-         impl->acceptor.listen(asio::socket_base::max_listen_connections);
-         impl->started = true;
+      impl->acceptor.open(endpoint.protocol());
+      impl->acceptor.set_option(asio::socket_base::reuse_address(true));
+      impl->acceptor.bind(endpoint);
+      impl->acceptor.listen(asio::socket_base::max_listen_connections);
+      impl->started = true;
 
-         asio::co_spawn(
-            impl->acceptor.get_executor(),
-            impl->accept_loop(),
-            [](std::exception_ptr error) {
-               if (error) {
-                  try {
-                     std::rethrow_exception(error);
-                  } catch (const std::exception&) {
-                  }
-               }
-            });
+      asio::co_spawn(impl->acceptor.get_executor(), impl->accept_loop(), [](std::exception_ptr error) {
+         if (error) {
+            try {
+               std::rethrow_exception(error);
+            } catch (const std::exception&) {
+            }
+         }
       });
+   });
 }
 
 void server::stop() {
@@ -253,14 +236,12 @@ void server::stop() {
       return;
    }
 
-   asio::dispatch(
-      impl_->acceptor.get_executor(),
-      [impl = impl_.get()] {
-         auto ignored = boost::system::error_code{};
-         impl->acceptor.cancel(ignored);
-         impl->acceptor.close(ignored);
-         impl->started = false;
-      });
+   asio::dispatch(impl_->acceptor.get_executor(), [impl = impl_.get()] {
+      auto ignored = boost::system::error_code{};
+      impl->acceptor.cancel(ignored);
+      impl->acceptor.close(ignored);
+      impl->started = false;
+   });
 }
 
 std::uint16_t server::port() const {

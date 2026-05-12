@@ -54,9 +54,8 @@ void append_bytes(std::vector<std::uint8_t>& out, const std::vector<std::uint8_t
 }
 
 class reader {
-public:
-   explicit reader(std::span<const std::uint8_t> bytes)
-      : bytes_(bytes) {}
+ public:
+   explicit reader(std::span<const std::uint8_t> bytes) : bytes_(bytes) {}
 
    [[nodiscard]] std::uint16_t u16() {
       require(2);
@@ -116,7 +115,7 @@ public:
       }
    }
 
-private:
+ private:
    void require(std::size_t size) const {
       if (size > bytes_.size() - offset_) {
          throw_p2p_error(error_kind::codec_error, "truncated P2P message");
@@ -255,9 +254,9 @@ p2p_message decode_message(std::span<const std::uint8_t> bytes, codec_options op
    out.endpoints.reserve(endpoint_count);
    for (auto i = std::uint32_t{0}; i != endpoint_count; ++i) {
       out.endpoints.push_back(endpoint_record{
-         .peer = peer_id{.value = in.string()},
-         .endpoint = fcl::quic::endpoint{.host = in.string(), .port = in.u16()},
-         .capabilities = capability_set{.bits = in.u64()},
+          .peer = peer_id{.value = in.string()},
+          .endpoint = fcl::quic::endpoint{.host = in.string(), .port = in.u16()},
+          .capabilities = capability_set{.bits = in.u64()},
       });
    }
    out.payload = in.bytes();
@@ -265,17 +264,13 @@ p2p_message decode_message(std::span<const std::uint8_t> bytes, codec_options op
    return out;
 }
 
-boost::asio::awaitable<void> async_write_message(
-   fcl::quic::framed_stream& stream,
-   const p2p_message& message,
-   codec_options options) {
+boost::asio::awaitable<void> async_write_message(fcl::quic::framed_stream& stream, const p2p_message& message,
+                                                 codec_options options) {
    auto encoded = encode_message(message, options);
    co_await stream.async_write_frame(encoded);
 }
 
-boost::asio::awaitable<p2p_message> async_read_message(
-   fcl::quic::framed_stream& stream,
-   codec_options options) {
+boost::asio::awaitable<p2p_message> async_read_message(fcl::quic::framed_stream& stream, codec_options options) {
    auto encoded = co_await stream.async_read_frame();
    co_return decode_message(encoded, options);
 }

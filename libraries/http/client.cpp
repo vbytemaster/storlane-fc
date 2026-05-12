@@ -29,8 +29,7 @@ request make_request(method method_value, const base_url& endpoint, std::string_
 } // namespace
 
 client::client(fcl::asio::runtime& runtime, base_url endpoint)
-   : endpoint_(std::move(endpoint))
-   , connection_(runtime, endpoint_) {}
+    : endpoint_(std::move(endpoint)), connection_(runtime, endpoint_) {}
 
 client::~client() = default;
 
@@ -42,10 +41,8 @@ boost::asio::awaitable<response> client::async_get(std::string_view path, reques
    co_return co_await async_request(make_request(method::get, endpoint_, path), options);
 }
 
-boost::asio::awaitable<response> client::async_post_json(
-   std::string_view path,
-   std::string body,
-   request_options options) {
+boost::asio::awaitable<response> client::async_post_json(std::string_view path, std::string body,
+                                                         request_options options) {
    co_return co_await async_request(make_request(method::post, endpoint_, path, std::move(body)), options);
 }
 

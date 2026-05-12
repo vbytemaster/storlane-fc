@@ -40,7 +40,7 @@ struct connection_metrics {
 };
 
 class connection {
-public:
+ public:
    connection(fcl::asio::runtime& runtime, base_url endpoint);
    ~connection();
 
@@ -51,7 +51,7 @@ public:
    response request(fcl::http::request request_value, request_options options = {});
    [[nodiscard]] connection_metrics metrics() const;
 
-private:
+ private:
    struct impl;
 
    std::unique_ptr<impl> impl_;

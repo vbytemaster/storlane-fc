@@ -14,7 +14,7 @@ export import fcl.quic.connection;
 export namespace fcl::quic {
 
 class connector {
-public:
+ public:
    explicit connector(fcl::asio::runtime& runtime);
    ~connector();
 
@@ -23,7 +23,7 @@ public:
 
    boost::asio::awaitable<connection> async_connect(endpoint remote, client_options options = {});
 
-private:
+ private:
    struct impl;
    std::unique_ptr<impl> impl_;
 };

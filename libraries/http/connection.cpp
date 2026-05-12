@@ -70,7 +70,7 @@ void ensure_host_header(request& request_value, const base_url& endpoint) {
 struct connection::impl {
    struct queued_request {
       explicit queued_request(asio::io_context& context)
-         : completion_timer(context, (std::chrono::steady_clock::time_point::max)()) {}
+          : completion_timer(context, (std::chrono::steady_clock::time_point::max)()) {}
 
       fcl::http::request request_value;
       request_options options;
@@ -116,11 +116,8 @@ struct connection::impl {
    };
 
    explicit impl(fcl::asio::runtime& runtime_value, base_url endpoint_value)
-      : runtime(runtime_value)
-      , endpoint(std::move(endpoint_value))
-      , strand(asio::make_strand(runtime.context()))
-      , resolver(strand)
-      , ssl_context(asio::ssl::context::tls_client) {
+       : runtime(runtime_value), endpoint(std::move(endpoint_value)), strand(asio::make_strand(runtime.context())),
+         resolver(strand), ssl_context(asio::ssl::context::tls_client) {
       ssl_context.set_default_verify_paths();
       ssl_context.set_verify_mode(asio::ssl::verify_peer);
    }
@@ -264,17 +261,14 @@ struct connection::impl {
       auto operation = requests.front();
       requests.pop_front();
 
-      asio::co_spawn(
-         strand,
-         process_request(std::move(operation)),
-         [](std::exception_ptr error) {
-            if (error) {
-               try {
-                  std::rethrow_exception(error);
-               } catch (const std::exception&) {
-               }
+      asio::co_spawn(strand, process_request(std::move(operation)), [](std::exception_ptr error) {
+         if (error) {
+            try {
+               std::rethrow_exception(error);
+            } catch (const std::exception&) {
             }
-         });
+         }
+      });
    }
 
    void close_plain() {
@@ -403,7 +397,7 @@ struct connection::impl {
 };
 
 connection::connection(fcl::asio::runtime& runtime, base_url endpoint)
-   : impl_(std::make_unique<impl>(runtime, std::move(endpoint))) {}
+    : impl_(std::make_unique<impl>(runtime, std::move(endpoint))) {}
 
 connection::~connection() = default;
 
@@ -412,11 +406,7 @@ boost::asio::awaitable<response> connection::async_request(fcl::http::request re
    operation->request_value = std::move(request_value);
    operation->options = options;
 
-   asio::post(
-      impl_->strand,
-      [impl = impl_.get(), operation]() mutable {
-         impl->enqueue(std::move(operation));
-      });
+   asio::post(impl_->strand, [impl = impl_.get(), operation]() mutable { impl->enqueue(std::move(operation)); });
 
    while (!operation->is_completed()) {
       auto error = boost::system::error_code{};

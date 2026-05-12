@@ -10,8 +10,8 @@ import fcl.tui.types;
 
 BOOST_AUTO_TEST_CASE(status_badge_renders_stable_text) {
    const auto lines = fcl::tui::render_status_badge(fcl::tui::status_badge_model{
-      .value = fcl::tui::status::degraded,
-      .label = "service degraded",
+       .value = fcl::tui::status::degraded,
+       .label = "service degraded",
    });
    BOOST_REQUIRE_EQUAL(lines.size(), 1);
    BOOST_TEST(lines[0] == "[degraded] service degraded");
@@ -30,10 +30,10 @@ BOOST_AUTO_TEST_CASE(table_states_render_without_terminal_backend) {
 
 BOOST_AUTO_TEST_CASE(key_value_panel_redacts_sensitive_values) {
    const auto lines = fcl::tui::render_key_value_panel({
-      {.key = "actor", .value = "operator"},
-      {.key = "token", .value = "secret-token-value"},
-      {.key = "workspace_secret", .value = "abc"},
-      {.key = "path", .value = "/tmp/node"},
+       {.key = "actor", .value = "operator"},
+       {.key = "token", .value = "secret-token-value"},
+       {.key = "workspace_secret", .value = "abc"},
+       {.key = "path", .value = "/tmp/node"},
    });
 
    BOOST_REQUIRE_EQUAL(lines.size(), 4);
@@ -45,12 +45,12 @@ BOOST_AUTO_TEST_CASE(key_value_panel_redacts_sensitive_values) {
 
 BOOST_AUTO_TEST_CASE(form_validation_reports_required_and_field_errors) {
    const auto result = fcl::tui::validate_form(fcl::tui::form_model{
-      .fields =
-         {
-            {.name = "workspace", .label = "Workspace", .required = true},
-            {.name = "endpoint", .label = "Endpoint", .value = "http://127.0.0.1:8888"},
-            {.name = "grant", .label = "Grant", .value = "1", .error = "wrong scope"},
-         },
+       .fields =
+           {
+               {.name = "workspace", .label = "Workspace", .required = true},
+               {.name = "endpoint", .label = "Endpoint", .value = "http://127.0.0.1:8888"},
+               {.name = "grant", .label = "Grant", .value = "1", .error = "wrong scope"},
+           },
    });
 
    BOOST_TEST(!result.ok);
@@ -61,12 +61,12 @@ BOOST_AUTO_TEST_CASE(form_validation_reports_required_and_field_errors) {
 
 BOOST_AUTO_TEST_CASE(form_render_redacts_sensitive_field_identity) {
    const auto lines = fcl::tui::render_form(fcl::tui::form_model{
-      .fields =
-         {
-            {.name = "token", .label = "Token", .value = "random-looking-value"},
-            {.name = "endpoint", .label = "Private Key", .value = "random-looking-key"},
-            {.name = "workspace", .label = "Workspace", .value = "public"},
-         },
+       .fields =
+           {
+               {.name = "token", .label = "Token", .value = "random-looking-value"},
+               {.name = "endpoint", .label = "Private Key", .value = "random-looking-key"},
+               {.name = "workspace", .label = "Workspace", .value = "public"},
+           },
    });
 
    BOOST_REQUIRE_EQUAL(lines.size(), 3);
@@ -77,9 +77,9 @@ BOOST_AUTO_TEST_CASE(form_render_redacts_sensitive_field_identity) {
 
 BOOST_AUTO_TEST_CASE(shell_render_redacts_endpoint_credentials_and_queries) {
    const auto lines = fcl::tui::render_shell(fcl::tui::shell_model{
-      .profile = "production",
-      .endpoint = "https://user:pass@example.test:443/api?signature=abcdef&expires=1#frag",
-      .actor = "operator",
+       .profile = "production",
+       .endpoint = "https://user:pass@example.test:443/api?signature=abcdef&expires=1#frag",
+       .actor = "operator",
    });
 
    BOOST_REQUIRE_GE(lines.size(), 2);
@@ -90,12 +90,12 @@ BOOST_AUTO_TEST_CASE(shell_render_redacts_endpoint_credentials_and_queries) {
 
 BOOST_AUTO_TEST_CASE(event_log_redacts_sensitive_messages) {
    const auto lines = fcl::tui::render_event_log(fcl::tui::event_log_model{
-      .events =
-         {
-            {.level = fcl::tui::severity::info, .topic = "runtime", .message = "started"},
-            {.level = fcl::tui::severity::critical, .topic = "auth", .message = "token abc"},
-         },
-      .max_items = 4,
+       .events =
+           {
+               {.level = fcl::tui::severity::info, .topic = "runtime", .message = "started"},
+               {.level = fcl::tui::severity::critical, .topic = "auth", .message = "token abc"},
+           },
+       .max_items = 4,
    });
 
    BOOST_REQUIRE_EQUAL(lines.size(), 2);
@@ -107,12 +107,12 @@ BOOST_AUTO_TEST_CASE(event_log_redacts_sensitive_messages) {
 BOOST_AUTO_TEST_CASE(navigation_stack_push_pop_and_selection) {
    auto stack = fcl::tui::navigation_stack{};
    stack.push(fcl::tui::navigation_model{
-      .items =
-         {
-            {.id = "apps", .label = "Applications"},
-            {.id = "health", .label = "Health"},
-         },
-      .selected = 0,
+       .items =
+           {
+               {.id = "apps", .label = "Applications"},
+               {.id = "health", .label = "Health"},
+           },
+       .selected = 0,
    });
 
    BOOST_REQUIRE(stack.current_item().has_value());
@@ -129,8 +129,8 @@ BOOST_AUTO_TEST_CASE(navigation_stack_push_pop_and_selection) {
 
 BOOST_AUTO_TEST_CASE(disabled_and_dangerous_action_states_are_visible) {
    const auto lines = fcl::tui::render_action_bar({
-      {.id = "approve", .label = "Approve", .state = fcl::tui::action_state::disabled},
-      {.id = "revoke", .label = "Revoke", .state = fcl::tui::action_state::dangerous},
+       {.id = "approve", .label = "Approve", .state = fcl::tui::action_state::disabled},
+       {.id = "revoke", .label = "Revoke", .state = fcl::tui::action_state::dangerous},
    });
 
    BOOST_REQUIRE_EQUAL(lines.size(), 1);
@@ -142,14 +142,12 @@ BOOST_AUTO_TEST_CASE(headless_runner_exits_through_injected_quit_event) {
    auto calls = 0;
    auto runner = fcl::tui::screen_runner{};
    const auto rc = runner.run(fcl::tui::screen_runner_options{
-      .headless = true,
-      .input = [&]() -> std::optional<fcl::tui::input_event> {
-         ++calls;
-         return fcl::tui::input_event{.value = fcl::tui::input_event::kind::quit};
-      },
-      .model = [] {
-         return fcl::tui::shell_model{.title = "test"};
-      },
+       .headless = true,
+       .input = [&]() -> std::optional<fcl::tui::input_event> {
+          ++calls;
+          return fcl::tui::input_event{.value = fcl::tui::input_event::kind::quit};
+       },
+       .model = [] { return fcl::tui::shell_model{.title = "test"}; },
    });
 
    BOOST_TEST(rc == 0);

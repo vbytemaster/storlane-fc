@@ -39,7 +39,7 @@ struct peer_record {
 };
 
 class peer_store {
-public:
+ public:
    peer_store();
    ~peer_store();
 
@@ -51,24 +51,19 @@ public:
 
    void upsert(peer_record record);
    void learn_endpoint(peer_id peer, fcl::quic::endpoint endpoint, capability_set capabilities = {});
-   void mark_reachability(peer_id peer, reachability_state state, std::optional<fcl::quic::endpoint> observed = std::nullopt);
+   void mark_reachability(peer_id peer, reachability_state state,
+                          std::optional<fcl::quic::endpoint> observed = std::nullopt);
    void mark_success(const peer_id& peer, path_kind kind, std::chrono::milliseconds latency);
    void mark_failure(const peer_id& peer);
-   void mark_endpoint_success(
-      const peer_id& peer,
-      const fcl::quic::endpoint& endpoint,
-      path_kind kind,
-      std::chrono::milliseconds latency);
-   void mark_endpoint_failure(
-      const peer_id& peer,
-      const fcl::quic::endpoint& endpoint,
-      path_kind kind,
-      std::chrono::steady_clock::time_point backoff_until);
+   void mark_endpoint_success(const peer_id& peer, const fcl::quic::endpoint& endpoint, path_kind kind,
+                              std::chrono::milliseconds latency);
+   void mark_endpoint_failure(const peer_id& peer, const fcl::quic::endpoint& endpoint, path_kind kind,
+                              std::chrono::steady_clock::time_point backoff_until);
 
    [[nodiscard]] std::optional<peer_record> find(const peer_id& peer) const;
    [[nodiscard]] std::vector<peer_record> snapshot() const;
 
-private:
+ private:
    struct impl;
    std::shared_ptr<impl> impl_;
 };

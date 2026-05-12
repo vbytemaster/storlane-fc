@@ -70,7 +70,7 @@ struct stream::impl {
 stream::stream() = default;
 
 stream::stream(detail::stream_handle handle)
-   : impl_(std::make_shared<impl>(impl{.engine = std::move(handle.engine)})) {}
+    : impl_(std::make_shared<impl>(impl{.engine = std::move(handle.engine)})) {}
 
 stream::~stream() = default;
 

@@ -15,9 +15,7 @@ namespace {
 
 using descriptor_map = std::map<std::string, const plugin_descriptor*>;
 
-[[nodiscard]] const plugin_descriptor& require_descriptor(
-   const descriptor_map& descriptors,
-   const plugin_id& id) {
+[[nodiscard]] const plugin_descriptor& require_descriptor(const descriptor_map& descriptors, const plugin_id& id) {
    const auto iterator = descriptors.find(id.value);
    if (iterator == descriptors.end()) {
       throw std::logic_error{"missing app plugin dependency: " + id.value};
@@ -36,13 +34,9 @@ using descriptor_map = std::map<std::string, const plugin_descriptor*>;
    return out;
 }
 
-void visit_plugin(
-   const plugin_descriptor& descriptor,
-   const descriptor_map& descriptors,
-   const std::map<std::string, bool>& explicit_values,
-   std::set<std::string>& visiting,
-   std::set<std::string>& visited,
-   std::vector<const plugin_descriptor*>& order) {
+void visit_plugin(const plugin_descriptor& descriptor, const descriptor_map& descriptors,
+                  const std::map<std::string, bool>& explicit_values, std::set<std::string>& visiting,
+                  std::set<std::string>& visited, std::vector<const plugin_descriptor*>& order) {
    if (visited.contains(descriptor.id.value)) {
       return;
    }
@@ -80,8 +74,8 @@ void plugin_registry::register_plugin(plugin_descriptor descriptor) {
    descriptors_.push_back(std::move(descriptor));
 }
 
-std::vector<std::unique_ptr<plugin>> plugin_registry::instantiate_enabled(
-   const std::vector<plugin_config>& config) const {
+std::vector<std::unique_ptr<plugin>>
+plugin_registry::instantiate_enabled(const std::vector<plugin_config>& config) const {
    const auto explicit_values = explicit_config(config);
 
    auto by_id = descriptor_map{};
@@ -92,9 +86,8 @@ std::vector<std::unique_ptr<plugin>> plugin_registry::instantiate_enabled(
    auto roots = std::vector<const plugin_descriptor*>{};
    for (const auto& descriptor : descriptors_) {
       const auto explicit_iterator = explicit_values.find(descriptor.id.value);
-      const auto enabled = explicit_iterator != explicit_values.end()
-         ? explicit_iterator->second
-         : descriptor.enabled_by_default;
+      const auto enabled =
+          explicit_iterator != explicit_values.end() ? explicit_iterator->second : descriptor.enabled_by_default;
       if (enabled) {
          roots.push_back(&descriptor);
       }

@@ -45,13 +45,7 @@ enum class reachability_state : std::uint16_t {
    relay_only = 4
 };
 
-enum class hole_punch_status : std::uint16_t {
-   not_attempted = 0,
-   prepared = 1,
-   synced = 2,
-   succeeded = 3,
-   failed = 4
-};
+enum class hole_punch_status : std::uint16_t { not_attempted = 0, prepared = 1, synced = 2, succeeded = 3, failed = 4 };
 
 namespace builtins {
 inline const protocol_id control{.value = "/fcl/p2p/control/1"};

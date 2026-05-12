@@ -47,9 +47,6 @@ import fcl.exception.exception;
  * Templated for std::string, std::string_view, std::vector<char> and other char containers.
  */
 
-
-
-
 export namespace fcl {
 
 // Interface:
@@ -68,8 +65,7 @@ export namespace fcl {
 template <typename RetString = std::string, typename String = std::string>
 RetString base64_encode(const String& s, bool url = false);
 
-template <typename RetString = std::string, typename String = std::string>
-RetString base64_encode_pem(const String& s);
+template <typename RetString = std::string, typename String = std::string> RetString base64_encode_pem(const String& s);
 
 template <typename RetString = std::string, typename String = std::string>
 RetString base64_encode_mime(const String& s);
@@ -83,72 +79,54 @@ RetString base64_encode(const unsigned char* s, size_t len, bool url = false);
 // Convenient methods for existing Spring uses
 
 std::string base64_encode(char const* s, unsigned int len);
-std::vector<char> base64_decode( const std::string& s);
+std::vector<char> base64_decode(const std::string& s);
 std::string base64url_encode(const char* s, size_t len);
 std::string base64url_encode(const std::string& s);
 std::vector<char> base64url_decode(const std::string& s);
 
 namespace detail {
- //
- // Depending on the url parameter in base64_chars, one of
- // two sets of base64 characters needs to be chosen.
- // They differ in their last two characters.
- //
-constexpr const char* to_base64_chars[2] = {
-             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-             "abcdefghijklmnopqrstuvwxyz"
-             "0123456789"
-             "+/",
+//
+// Depending on the url parameter in base64_chars, one of
+// two sets of base64 characters needs to be chosen.
+// They differ in their last two characters.
+//
+constexpr const char* to_base64_chars[2] = {"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                            "abcdefghijklmnopqrstuvwxyz"
+                                            "0123456789"
+                                            "+/",
 
-             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-             "abcdefghijklmnopqrstuvwxyz"
-             "0123456789"
-             "-_"};
+                                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                            "abcdefghijklmnopqrstuvwxyz"
+                                            "0123456789"
+                                            "-_"};
 
 constexpr unsigned char from_base64_chars[2][256] = {
-{
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63,
-    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64,
-    64,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 64, 64, 64, 64, 64,
-    64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
-},
-{
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64,
-    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64,
-    64,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,
-    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 64, 64, 64, 64, 63,
-    64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64
-}};
+    {64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 64, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+     64, 64, 64, 64, 64, 64, 64, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+     22, 23, 24, 25, 64, 64, 64, 64, 64, 64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
+     45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64},
+    {64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62, 64, 64, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+     64, 64, 64, 64, 64, 64, 64, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+     22, 23, 24, 25, 64, 64, 64, 64, 63, 64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
+     45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64}};
 
 inline unsigned int pos_of_char(const unsigned char chr, bool url) {
    //
    // Return the position of chr within base64_encode()
    //
 
-   if (from_base64_chars[url][chr] != 64) return from_base64_chars[url][chr];
+   if (from_base64_chars[url][chr] != 64)
+      return from_base64_chars[url][chr];
 
    //
    // 2020-10-23: Throw std::exception rather than const char*
@@ -159,8 +137,7 @@ inline unsigned int pos_of_char(const unsigned char chr, bool url) {
    FCL_ASSERT(false, "encountered non-base64 character");
 }
 
-template <typename RetString, typename String>
-inline RetString insert_linebreaks(const String& str, size_t distance) {
+template <typename RetString, typename String> inline RetString insert_linebreaks(const String& str, size_t distance) {
    //
    // Provided by https://github.com/JomaCorpFX, adapted by Rene & Kevin
    //
@@ -186,19 +163,16 @@ inline RetString encode_with_line_breaks(String s) {
    return insert_linebreaks<RetString, String>(base64_encode(s, false), line_length);
 }
 
-template <typename RetString, typename String>
-inline RetString encode_pem(String s) {
+template <typename RetString, typename String> inline RetString encode_pem(String s) {
    return encode_with_line_breaks<RetString, String, 64>(s);
 }
 
-template <typename RetString, typename String>
-inline RetString encode_mime(String s) {
+template <typename RetString, typename String> inline RetString encode_mime(String s) {
    return encode_with_line_breaks<RetString, String, 76>(s);
 }
 
-template <typename RetString, typename String>
-inline RetString encode(String s, bool url) {
-  return base64_encode<RetString>(reinterpret_cast<const unsigned char*>(s.data()), s.size(), url);
+template <typename RetString, typename String> inline RetString encode(String s, bool url) {
+   return base64_encode<RetString>(reinterpret_cast<const unsigned char*>(s.data()), s.size(), url);
 }
 
 } // namespace detail
@@ -229,21 +203,24 @@ inline RetString base64_encode(const unsigned char* bytes_to_encode, size_t in_l
       ret.push_back(base64_chars_[(bytes_to_encode[pos + 0] & 0xfc) >> 2]);
 
       if (pos + 1 < in_len) {
-         ret.push_back(base64_chars_[((bytes_to_encode[pos + 0] & 0x03) << 4) +
-                                     ((bytes_to_encode[pos + 1] & 0xf0) >> 4)]);
+         ret.push_back(
+             base64_chars_[((bytes_to_encode[pos + 0] & 0x03) << 4) + ((bytes_to_encode[pos + 1] & 0xf0) >> 4)]);
 
          if (pos + 2 < in_len) {
-            ret.push_back(base64_chars_[((bytes_to_encode[pos + 1] & 0x0f) << 2) +
-                                        ((bytes_to_encode[pos + 2] & 0xc0) >> 6)]);
+            ret.push_back(
+                base64_chars_[((bytes_to_encode[pos + 1] & 0x0f) << 2) + ((bytes_to_encode[pos + 2] & 0xc0) >> 6)]);
             ret.push_back(base64_chars_[bytes_to_encode[pos + 2] & 0x3f]);
          } else {
             ret.push_back(base64_chars_[(bytes_to_encode[pos + 1] & 0x0f) << 2]);
-            if (!url) ret.push_back(trailing_char);
+            if (!url)
+               ret.push_back(trailing_char);
          }
       } else {
          ret.push_back(base64_chars_[(bytes_to_encode[pos + 0] & 0x03) << 4]);
-         if (!url) ret.push_back(trailing_char);
-         if (!url) ret.push_back(trailing_char);
+         if (!url)
+            ret.push_back(trailing_char);
+         if (!url)
+            ret.push_back(trailing_char);
       }
 
       pos += 3;
@@ -306,7 +283,8 @@ inline RetString decode(const String& encoded_string, bool remove_linebreaks, bo
       //
       // Emit the first output byte that is produced in each chunk:
       //
-      ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char(encoded_string.at(pos + 0), url)) << 2) + ((pos_of_char_1 & 0x30) >> 4)));
+      ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char(encoded_string.at(pos + 0), url)) << 2) +
+                                                                ((pos_of_char_1 & 0x30) >> 4)));
 
       if ((pos + 2 < length_of_string) &&
           // Check for data that is not padded with equal signs (which is allowed by RFC 2045)
@@ -315,14 +293,15 @@ inline RetString decode(const String& encoded_string, bool remove_linebreaks, bo
          // Emit a chunk's second byte (which might not be produced in the last chunk).
          //
          unsigned int pos_of_char_2 = pos_of_char(encoded_string.at(pos + 2), url);
-         ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char_1 & 0x0f) << 4) + ((pos_of_char_2 & 0x3c) >> 2)));
+         ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char_1 & 0x0f) << 4) +
+                                                                   ((pos_of_char_2 & 0x3c) >> 2)));
 
-         if ((pos + 3 < length_of_string) &&
-             encoded_string.at(pos + 3) != '=') {
+         if ((pos + 3 < length_of_string) && encoded_string.at(pos + 3) != '=') {
             //
             // Emit a chunk's third byte (which might not be produced in the last chunk).
             //
-            ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char_2 & 0x03) << 6) + pos_of_char(encoded_string.at(pos + 3), url)));
+            ret.push_back(static_cast<typename RetString::value_type>(((pos_of_char_2 & 0x03) << 6) +
+                                                                      pos_of_char(encoded_string.at(pos + 3), url)));
          }
       }
 
@@ -339,18 +318,15 @@ inline RetString base64_decode(const String& s, bool remove_linebreaks, bool url
    return detail::decode<RetString, String>(s, remove_linebreaks, url);
 }
 
-template <typename RetString, typename String>
-inline RetString base64_encode(const String& s, bool url) {
+template <typename RetString, typename String> inline RetString base64_encode(const String& s, bool url) {
    return detail::encode<RetString, String>(s, url);
 }
 
-template <typename RetString, typename String>
-inline RetString base64_encode_pem (const String& s) {
+template <typename RetString, typename String> inline RetString base64_encode_pem(const String& s) {
    return detail::encode_pem<RetString, String>(s);
 }
 
-template <typename RetString, typename String>
-inline RetString base64_encode_mime(const String& s) {
+template <typename RetString, typename String> inline RetString base64_encode_mime(const String& s) {
    return detail::encode_mime<RetString, String>(s);
 }
 
@@ -359,7 +335,7 @@ inline std::string base64_encode(char const* s, unsigned int len) {
    return base64_encode<std::string>((unsigned char const*)s, len, false);
 }
 
-inline std::vector<char> base64_decode( const std::string& s) {
+inline std::vector<char> base64_decode(const std::string& s) {
    return detail::decode<std::vector<char>, std::string>(s, false, false);
 }
 
@@ -375,4 +351,3 @@ inline std::vector<char> base64url_decode(const std::string& s) {
    return detail::decode<std::vector<char>>(s, false, true);
 }
 } // namespace fcl
-

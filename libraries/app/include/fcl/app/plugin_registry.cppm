@@ -20,13 +20,13 @@ struct plugin_descriptor {
 };
 
 class plugin_registry {
-public:
+ public:
    void register_plugin(plugin_descriptor descriptor);
-   [[nodiscard]] std::vector<std::unique_ptr<plugin>> instantiate_enabled(
-      const std::vector<plugin_config>& config) const;
+   [[nodiscard]] std::vector<std::unique_ptr<plugin>>
+   instantiate_enabled(const std::vector<plugin_config>& config) const;
    [[nodiscard]] std::vector<plugin_descriptor> descriptors() const;
 
-private:
+ private:
    std::vector<plugin_descriptor> descriptors_;
 };
 

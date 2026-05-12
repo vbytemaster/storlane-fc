@@ -26,45 +26,43 @@ namespace {
 using codec_value = glz::generic_json<glz::num_mode::u64>;
 
 constexpr glz::yaml::yaml_opts yaml_read_options{
-   .format = glz::YAML,
-   .error_on_unknown_keys = false,
-   .error_on_missing_keys = false,
-   .skip_null_members = false,
-   .indent_width = 2,
-   .flow_style = false,
+    .format = glz::YAML,
+    .error_on_unknown_keys = false,
+    .error_on_missing_keys = false,
+    .skip_null_members = false,
+    .indent_width = 2,
+    .flow_style = false,
 };
 
 constexpr glz::yaml::yaml_opts yaml_write_block_options{
-   .format = glz::YAML,
-   .error_on_unknown_keys = false,
-   .error_on_missing_keys = false,
-   .skip_null_members = false,
-   .indent_width = 2,
-   .flow_style = false,
+    .format = glz::YAML,
+    .error_on_unknown_keys = false,
+    .error_on_missing_keys = false,
+    .skip_null_members = false,
+    .indent_width = 2,
+    .flow_style = false,
 };
 
 constexpr glz::yaml::yaml_opts yaml_write_flow_options{
-   .format = glz::YAML,
-   .error_on_unknown_keys = false,
-   .error_on_missing_keys = false,
-   .skip_null_members = false,
-   .indent_width = 2,
-   .flow_style = true,
+    .format = glz::YAML,
+    .error_on_unknown_keys = false,
+    .error_on_missing_keys = false,
+    .skip_null_members = false,
+    .indent_width = 2,
+    .flow_style = true,
 };
 
-template <class... Ts>
-struct overloaded : Ts... {
+template <class... Ts> struct overloaded : Ts... {
    using Ts::operator()...;
 };
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 [[nodiscard]] schema::diagnostic make_error(std::string path, std::string code, std::string message) {
    return schema::diagnostic{
-      .path = std::move(path),
-      .code = std::move(code),
-      .level = schema::severity::error,
-      .message = std::move(message),
+       .path = std::move(path),
+       .code = std::move(code),
+       .level = schema::severity::error,
+       .message = std::move(message),
    };
 }
 
@@ -74,169 +72,130 @@ overloaded(Ts...) -> overloaded<Ts...>;
 [[nodiscard]] codec_value from_config_value(const config::value& input);
 
 [[nodiscard]] variant to_variant_value(const codec_value& input) {
-   return std::visit(
-      overloaded{
-         [](std::nullptr_t) -> variant {
-            return variant{};
-         },
-         [](std::uint64_t value) -> variant {
-            return variant{value};
-         },
-         [](std::int64_t value) -> variant {
-            return variant{value};
-         },
-         [](double value) -> variant {
-            return variant{value};
-         },
-         [](const std::string& value) -> variant {
-            return variant{value};
-         },
-         [](bool value) -> variant {
-            return variant{value};
-         },
-         [](const codec_value::array_t& value) -> variant {
-            auto array = variants{};
-            array.reserve(value.size());
-            for (const auto& entry : value) {
-               array.push_back(to_variant_value(entry));
-            }
-            return variant{std::move(array)};
-         },
-         [](const codec_value::object_t& value) -> variant {
-            auto object = mutable_variant_object{};
-            for (const auto& [key, entry] : value) {
-               object.set(key, to_variant_value(entry));
-            }
-            return variant{std::move(object)};
-         },
-      },
-      input.data);
+   return std::visit(overloaded{
+                         [](std::nullptr_t) -> variant { return variant{}; },
+                         [](std::uint64_t value) -> variant { return variant{value}; },
+                         [](std::int64_t value) -> variant { return variant{value}; },
+                         [](double value) -> variant { return variant{value}; },
+                         [](const std::string& value) -> variant { return variant{value}; },
+                         [](bool value) -> variant { return variant{value}; },
+                         [](const codec_value::array_t& value) -> variant {
+                            auto array = variants{};
+                            array.reserve(value.size());
+                            for (const auto& entry : value) {
+                               array.push_back(to_variant_value(entry));
+                            }
+                            return variant{std::move(array)};
+                         },
+                         [](const codec_value::object_t& value) -> variant {
+                            auto object = mutable_variant_object{};
+                            for (const auto& [key, entry] : value) {
+                               object.set(key, to_variant_value(entry));
+                            }
+                            return variant{std::move(object)};
+                         },
+                     },
+                     input.data);
 }
 
 [[nodiscard]] config::value to_config_value(const codec_value& input) {
-   return std::visit(
-      overloaded{
-         [](std::nullptr_t) -> config::value {
-            return config::value{};
-         },
-         [](std::uint64_t value) -> config::value {
-            return config::value{value};
-         },
-         [](std::int64_t value) -> config::value {
-            return config::value{value};
-         },
-         [](double value) -> config::value {
-            return config::value{value};
-         },
-         [](const std::string& value) -> config::value {
-            return config::value{value};
-         },
-         [](bool value) -> config::value {
-            return config::value{value};
-         },
-         [](const codec_value::array_t& value) -> config::value {
-            auto array = config::value::array_type{};
-            array.reserve(value.size());
-            for (const auto& entry : value) {
-               array.push_back(to_config_value(entry));
-            }
-            return config::value{std::move(array)};
-         },
-         [](const codec_value::object_t& value) -> config::value {
-            auto object = config::value::object_type{};
-            for (const auto& [key, entry] : value) {
-               object.emplace(key, to_config_value(entry));
-            }
-            return config::value{std::move(object)};
-         },
-      },
-      input.data);
+   return std::visit(overloaded{
+                         [](std::nullptr_t) -> config::value { return config::value{}; },
+                         [](std::uint64_t value) -> config::value { return config::value{value}; },
+                         [](std::int64_t value) -> config::value { return config::value{value}; },
+                         [](double value) -> config::value { return config::value{value}; },
+                         [](const std::string& value) -> config::value { return config::value{value}; },
+                         [](bool value) -> config::value { return config::value{value}; },
+                         [](const codec_value::array_t& value) -> config::value {
+                            auto array = config::value::array_type{};
+                            array.reserve(value.size());
+                            for (const auto& entry : value) {
+                               array.push_back(to_config_value(entry));
+                            }
+                            return config::value{std::move(array)};
+                         },
+                         [](const codec_value::object_t& value) -> config::value {
+                            auto object = config::value::object_type{};
+                            for (const auto& [key, entry] : value) {
+                               object.emplace(key, to_config_value(entry));
+                            }
+                            return config::value{std::move(object)};
+                         },
+                     },
+                     input.data);
 }
 
 [[nodiscard]] codec_value from_variant_value(const variant& input) {
    auto output = codec_value{};
    switch (input.get_type()) {
-      case variant::null_type:
-         output = nullptr;
-         break;
-      case variant::int64_type:
-         output = input.as_int64();
-         break;
-      case variant::uint64_type:
-         output = input.as_uint64();
-         break;
-      case variant::double_type:
-         output = input.as_double();
-         break;
-      case variant::bool_type:
-         output = input.as_bool();
-         break;
-      case variant::string_type:
-         output = input.get_string();
-         break;
-      case variant::array_type: {
-         auto array = codec_value::array_t{};
-         array.reserve(input.get_array().size());
-         for (const auto& entry : input.get_array()) {
-            array.push_back(from_variant_value(entry));
-         }
-         output = std::move(array);
-         break;
+   case variant::null_type:
+      output = nullptr;
+      break;
+   case variant::int64_type:
+      output = input.as_int64();
+      break;
+   case variant::uint64_type:
+      output = input.as_uint64();
+      break;
+   case variant::double_type:
+      output = input.as_double();
+      break;
+   case variant::bool_type:
+      output = input.as_bool();
+      break;
+   case variant::string_type:
+      output = input.get_string();
+      break;
+   case variant::array_type: {
+      auto array = codec_value::array_t{};
+      array.reserve(input.get_array().size());
+      for (const auto& entry : input.get_array()) {
+         array.push_back(from_variant_value(entry));
       }
-      case variant::object_type: {
-         auto object = codec_value::object_t{};
-         for (const auto& entry : input.get_object()) {
-            object.insert(std::make_pair(entry.key(), from_variant_value(entry.value())));
-         }
-         output = std::move(object);
-         break;
+      output = std::move(array);
+      break;
+   }
+   case variant::object_type: {
+      auto object = codec_value::object_t{};
+      for (const auto& entry : input.get_object()) {
+         object.insert(std::make_pair(entry.key(), from_variant_value(entry.value())));
       }
-      case variant::blob_type:
-         output = input.as_string();
-         break;
+      output = std::move(object);
+      break;
+   }
+   case variant::blob_type:
+      output = input.as_string();
+      break;
    }
    return output;
 }
 
 [[nodiscard]] codec_value from_config_value(const config::value& input) {
    auto output = codec_value{};
-   std::visit(
-      overloaded{
-         [&](std::monostate) {
-            output = nullptr;
-         },
-         [&](bool value) {
-            output = value;
-         },
-         [&](std::int64_t value) {
-            output = value;
-         },
-         [&](std::uint64_t value) {
-            output = value;
-         },
-         [&](double value) {
-            output = value;
-         },
-         [&](const std::string& value) {
-            output = value;
-         },
-         [&](const config::value::array_type& value) {
-            auto array = codec_value::array_t{};
-            array.reserve(value.size());
-            for (const auto& entry : value) {
-               array.push_back(from_config_value(entry));
-            }
-            output = std::move(array);
-         },
-         [&](const config::value::object_type& value) {
-            auto object = codec_value::object_t{};
-            for (const auto& [key, entry] : value) {
-               object.insert(std::make_pair(key, from_config_value(entry)));
-            }
-            output = std::move(object);
-         },
-      },
-      input.storage);
+   std::visit(overloaded{
+                  [&](std::monostate) { output = nullptr; },
+                  [&](bool value) { output = value; },
+                  [&](std::int64_t value) { output = value; },
+                  [&](std::uint64_t value) { output = value; },
+                  [&](double value) { output = value; },
+                  [&](const std::string& value) { output = value; },
+                  [&](const config::value::array_type& value) {
+                     auto array = codec_value::array_t{};
+                     array.reserve(value.size());
+                     for (const auto& entry : value) {
+                        array.push_back(from_config_value(entry));
+                     }
+                     output = std::move(array);
+                  },
+                  [&](const config::value::object_type& value) {
+                     auto object = codec_value::object_t{};
+                     for (const auto& [key, entry] : value) {
+                        object.insert(std::make_pair(key, from_config_value(entry)));
+                     }
+                     output = std::move(object);
+                  },
+              },
+              input.storage);
    return output;
 }
 
@@ -284,10 +243,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
    auto result = read_result<codec_value>{};
    auto parsed = codec_value{};
    if (auto error = glz::read<yaml_read_options>(parsed, input)) {
-      result.diagnostics.push_back(make_error(
-         options.source_name,
-         "yaml.parse",
-         glz::format_error(error, input)));
+      result.diagnostics.push_back(make_error(options.source_name, "yaml.parse", glz::format_error(error, input)));
       return result;
    }
    result.value = std::move(parsed);
@@ -302,9 +258,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
    }
 
    auto text = std::string{};
-   const auto error = options.flow_style
-      ? glz::write<yaml_write_flow_options>(input, text)
-      : glz::write<yaml_write_block_options>(input, text);
+   const auto error = options.flow_style ? glz::write<yaml_write_flow_options>(input, text)
+                                         : glz::write<yaml_write_block_options>(input, text);
    if (error) {
       result.diagnostics.push_back(make_error({}, "yaml.write", glz::format_error(error, text)));
       return result;
@@ -317,7 +272,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
    return result;
 }
 
-[[nodiscard]] std::string read_file_text(const std::filesystem::path& path, std::vector<schema::diagnostic>& diagnostics, std::string_view code) {
+[[nodiscard]] std::string read_file_text(const std::filesystem::path& path,
+                                         std::vector<schema::diagnostic>& diagnostics, std::string_view code) {
    auto input = std::ifstream{path, std::ios::binary};
    if (!input) {
       diagnostics.push_back(make_error(path.string(), std::string{code}, "failed to open file"));
@@ -326,11 +282,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
    return std::string{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
 }
 
-[[nodiscard]] bool write_file_text(
-   const std::filesystem::path& path,
-   std::string_view text,
-   std::vector<schema::diagnostic>& diagnostics,
-   std::string_view code) {
+[[nodiscard]] bool write_file_text(const std::filesystem::path& path, std::string_view text,
+                                   std::vector<schema::diagnostic>& diagnostics, std::string_view code) {
    auto output = std::ofstream{path, std::ios::binary | std::ios::trunc};
    if (!output) {
       diagnostics.push_back(make_error(path.string(), std::string{code}, "failed to open file for writing"));
@@ -355,7 +308,8 @@ read_result<variant> read_value(std::string_view input, read_options options) {
    }
    result.value = to_variant_value(parsed.value);
    if (exceeds_depth(result.value, options.max_depth)) {
-      result.diagnostics.push_back(make_error(options.source_name, "yaml.depth", "YAML input exceeds configured maximum depth"));
+      result.diagnostics.push_back(
+          make_error(options.source_name, "yaml.depth", "YAML input exceeds configured maximum depth"));
    }
    return result;
 }
@@ -374,12 +328,14 @@ read_result<config::document> read_document(std::string_view input, read_options
 
    auto root = to_config_value(parsed.value);
    if (exceeds_depth(root, options.max_depth)) {
-      result.diagnostics.push_back(make_error(options.source_name, "yaml.depth", "YAML input exceeds configured maximum depth"));
+      result.diagnostics.push_back(
+          make_error(options.source_name, "yaml.depth", "YAML input exceeds configured maximum depth"));
       return result;
    }
    const auto* object = root.as_object();
    if (!object) {
-      result.diagnostics.push_back(make_error(options.source_name, "yaml.document", "YAML config document root must be an object"));
+      result.diagnostics.push_back(
+          make_error(options.source_name, "yaml.document", "YAML config document root must be an object"));
       return result;
    }
    result.value.root = *object;

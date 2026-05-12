@@ -15,40 +15,24 @@ namespace fcl {
 namespace {
 
 constexpr std::array<std::uint64_t, 8> blake2b_iv = {
-   0x6a09e667f3bcc908ULL,
-   0xbb67ae8584caa73bULL,
-   0x3c6ef372fe94f82bULL,
-   0xa54ff53a5f1d36f1ULL,
-   0x510e527fade682d1ULL,
-   0x9b05688c2b3e6c1fULL,
-   0x1f83d9abfb41bd6bULL,
-   0x5be0cd19137e2179ULL
-};
+    0x6a09e667f3bcc908ULL, 0xbb67ae8584caa73bULL, 0x3c6ef372fe94f82bULL, 0xa54ff53a5f1d36f1ULL,
+    0x510e527fade682d1ULL, 0x9b05688c2b3e6c1fULL, 0x1f83d9abfb41bd6bULL, 0x5be0cd19137e2179ULL};
 
 constexpr std::uint8_t blake2b_sigma[12][16] = {
-   {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-   {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
-   {11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4},
-   {7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8},
-   {9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13},
-   {2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9},
-   {12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11},
-   {13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10},
-   {6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5},
-   {10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0},
-   {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-   {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3}
-};
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
+    {11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4}, {7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8},
+    {9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13}, {2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9},
+    {12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11}, {13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10},
+    {6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5}, {10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3}};
 
-std::uint64_t load64(const void* src)
-{
+std::uint64_t load64(const void* src) {
    std::uint64_t value = 0;
    std::memcpy(&value, src, sizeof(value));
    return value;
 }
 
-std::uint64_t rotr64(std::uint64_t word, unsigned count) noexcept
-{
+std::uint64_t rotr64(std::uint64_t word, unsigned count) noexcept {
    return (word >> count) | (word << (64U - count));
 }
 
@@ -59,24 +43,26 @@ struct blake2b_state {
 };
 
 class blake2b_wrapper {
-public:
+ public:
    static constexpr std::size_t block_bytes = 128;
 
-   void compress(blake2b_state* state, const std::uint8_t block[block_bytes], std::size_t rounds, const yield_function_t& yield);
+   void compress(blake2b_state* state, const std::uint8_t block[block_bytes], std::size_t rounds,
+                 const yield_function_t& yield);
 
-private:
+ private:
    std::uint64_t m_[16] = {};
    std::uint64_t v_[16] = {};
    std::size_t index_ = 0;
 
-   void mix(std::uint8_t round, std::uint8_t index, std::uint64_t& a, std::uint64_t& b, std::uint64_t& c, std::uint64_t& d) noexcept;
+   void mix(std::uint8_t round, std::uint8_t index, std::uint64_t& a, std::uint64_t& b, std::uint64_t& c,
+            std::uint64_t& d) noexcept;
    void round(std::uint8_t round) noexcept;
    void init(blake2b_state* state, const std::uint8_t block[block_bytes]);
    void finish(blake2b_state* state);
 };
 
-void blake2b_wrapper::mix(std::uint8_t round, std::uint8_t index, std::uint64_t& a, std::uint64_t& b, std::uint64_t& c, std::uint64_t& d) noexcept
-{
+void blake2b_wrapper::mix(std::uint8_t round, std::uint8_t index, std::uint64_t& a, std::uint64_t& b, std::uint64_t& c,
+                          std::uint64_t& d) noexcept {
    a = a + b + m_[blake2b_sigma[round][2 * index + 0]];
    d = rotr64(d ^ a, 32);
    c = c + d;
@@ -87,8 +73,7 @@ void blake2b_wrapper::mix(std::uint8_t round, std::uint8_t index, std::uint64_t&
    b = rotr64(b ^ c, 63);
 }
 
-void blake2b_wrapper::round(std::uint8_t round) noexcept
-{
+void blake2b_wrapper::round(std::uint8_t round) noexcept {
    mix(round, 0, v_[0], v_[4], v_[8], v_[12]);
    mix(round, 1, v_[1], v_[5], v_[9], v_[13]);
    mix(round, 2, v_[2], v_[6], v_[10], v_[14]);
@@ -99,8 +84,8 @@ void blake2b_wrapper::round(std::uint8_t round) noexcept
    mix(round, 7, v_[3], v_[4], v_[9], v_[14]);
 }
 
-void blake2b_wrapper::compress(blake2b_state* state, const std::uint8_t block[block_bytes], std::size_t rounds, const yield_function_t& yield)
-{
+void blake2b_wrapper::compress(blake2b_state* state, const std::uint8_t block[block_bytes], std::size_t rounds,
+                               const yield_function_t& yield) {
    init(state, block);
 
    for (index_ = 0; index_ < rounds; ++index_) {
@@ -113,8 +98,7 @@ void blake2b_wrapper::compress(blake2b_state* state, const std::uint8_t block[bl
    finish(state);
 }
 
-void blake2b_wrapper::init(blake2b_state* state, const std::uint8_t block[block_bytes])
-{
+void blake2b_wrapper::init(blake2b_state* state, const std::uint8_t block[block_bytes]) {
    for (index_ = 0; index_ < 16; ++index_) {
       m_[index_] = load64(block + index_ * sizeof(m_[index_]));
    }
@@ -133,8 +117,7 @@ void blake2b_wrapper::init(blake2b_state* state, const std::uint8_t block[block_
    v_[15] = blake2b_iv[7];
 }
 
-void blake2b_wrapper::finish(blake2b_state* state)
-{
+void blake2b_wrapper::finish(blake2b_state* state) {
    for (index_ = 0; index_ < 8; ++index_) {
       state->h[index_] = state->h[index_] ^ v_[index_] ^ v_[index_ + 8];
    }
@@ -142,15 +125,8 @@ void blake2b_wrapper::finish(blake2b_state* state)
 
 } // namespace
 
-std::variant<blake2b_error, bytes> blake2b(
-   std::uint32_t rounds,
-   const bytes& h,
-   const bytes& m,
-   const bytes& t0_offset,
-   const bytes& t1_offset,
-   bool final_block,
-   const yield_function_t& yield)
-{
+std::variant<blake2b_error, bytes> blake2b(std::uint32_t rounds, const bytes& h, const bytes& m, const bytes& t0_offset,
+                                           const bytes& t1_offset, bool final_block, const yield_function_t& yield) {
    if (h.size() != 64 || m.size() != blake2b_wrapper::block_bytes || t0_offset.size() != 8 || t1_offset.size() != 8) {
       return std::variant<blake2b_error, bytes>{std::in_place_index<0>, blake2b_error::input_len_error};
    }

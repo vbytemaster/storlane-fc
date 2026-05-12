@@ -35,30 +35,28 @@ T run(fcl::asio::runtime& runtime, boost::asio::awaitable<T> operation) {
 
    auto shared = std::make_shared<state>();
    boost::asio::co_spawn(
-      runtime.context(),
-      [operation = std::move(operation), shared]() mutable -> boost::asio::awaitable<void> {
-         auto value = std::optional<T>{};
-         auto error = std::exception_ptr{};
-         try {
-            value.emplace(co_await std::move(operation));
-         } catch (...) {
-            error = std::current_exception();
-         }
+       runtime.context(),
+       [operation = std::move(operation), shared]() mutable -> boost::asio::awaitable<void> {
+          auto value = std::optional<T>{};
+          auto error = std::exception_ptr{};
+          try {
+             value.emplace(co_await std::move(operation));
+          } catch (...) {
+             error = std::current_exception();
+          }
 
-         {
-            const auto lock = std::scoped_lock{shared->mutex};
-            shared->value = std::move(value);
-            shared->error = std::move(error);
-            shared->done = true;
-         }
-         shared->ready.notify_all();
-      },
-      boost::asio::detached);
+          {
+             const auto lock = std::scoped_lock{shared->mutex};
+             shared->value = std::move(value);
+             shared->error = std::move(error);
+             shared->done = true;
+          }
+          shared->ready.notify_all();
+       },
+       boost::asio::detached);
 
    auto lock = std::unique_lock{shared->mutex};
-   shared->ready.wait(lock, [&] {
-      return shared->done;
-   });
+   shared->ready.wait(lock, [&] { return shared->done; });
 
    if (shared->error) {
       std::rethrow_exception(shared->error);
@@ -76,38 +74,34 @@ inline void run(fcl::asio::runtime& runtime, boost::asio::awaitable<void> operat
 
    auto shared = std::make_shared<state>();
    boost::asio::co_spawn(
-      runtime.context(),
-      [operation = std::move(operation), shared]() mutable -> boost::asio::awaitable<void> {
-         auto error = std::exception_ptr{};
-         try {
-            co_await std::move(operation);
-         } catch (...) {
-            error = std::current_exception();
-         }
+       runtime.context(),
+       [operation = std::move(operation), shared]() mutable -> boost::asio::awaitable<void> {
+          auto error = std::exception_ptr{};
+          try {
+             co_await std::move(operation);
+          } catch (...) {
+             error = std::current_exception();
+          }
 
-         {
-            const auto lock = std::scoped_lock{shared->mutex};
-            shared->error = std::move(error);
-            shared->done = true;
-         }
-         shared->ready.notify_all();
-      },
-      boost::asio::detached);
+          {
+             const auto lock = std::scoped_lock{shared->mutex};
+             shared->error = std::move(error);
+             shared->done = true;
+          }
+          shared->ready.notify_all();
+       },
+       boost::asio::detached);
 
    auto lock = std::unique_lock{shared->mutex};
-   shared->ready.wait(lock, [&] {
-      return shared->done;
-   });
+   shared->ready.wait(lock, [&] { return shared->done; });
 
    if (shared->error) {
       std::rethrow_exception(shared->error);
    }
 }
 
-inline bool run_for(
-   fcl::asio::runtime& runtime,
-   boost::asio::awaitable<void> operation,
-   std::chrono::milliseconds timeout) {
+inline bool run_for(fcl::asio::runtime& runtime, boost::asio::awaitable<void> operation,
+                    std::chrono::milliseconds timeout) {
    struct state {
       std::mutex mutex;
       std::condition_variable ready;
@@ -121,49 +115,47 @@ inline bool run_for(
    timer->expires_after(timeout);
 
    boost::asio::co_spawn(
-      runtime.context(),
-      [operation = std::move(operation), shared, timer]() mutable -> boost::asio::awaitable<void> {
-         auto error = std::exception_ptr{};
-         try {
-            co_await std::move(operation);
-         } catch (...) {
-            error = std::current_exception();
-         }
+       runtime.context(),
+       [operation = std::move(operation), shared, timer]() mutable -> boost::asio::awaitable<void> {
+          auto error = std::exception_ptr{};
+          try {
+             co_await std::move(operation);
+          } catch (...) {
+             error = std::current_exception();
+          }
 
-         {
-            const auto lock = std::scoped_lock{shared->mutex};
-            if (!shared->done) {
-               shared->error = std::move(error);
-               shared->done = true;
-            }
-         }
-         timer->cancel();
-         shared->ready.notify_all();
-      },
-      boost::asio::detached);
+          {
+             const auto lock = std::scoped_lock{shared->mutex};
+             if (!shared->done) {
+                shared->error = std::move(error);
+                shared->done = true;
+             }
+          }
+          timer->cancel();
+          shared->ready.notify_all();
+       },
+       boost::asio::detached);
 
    boost::asio::co_spawn(
-      runtime.context(),
-      [shared, timer]() -> boost::asio::awaitable<void> {
-         auto error = boost::system::error_code{};
-         co_await timer->async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, error));
-         if (!error) {
-            {
-               const auto lock = std::scoped_lock{shared->mutex};
-               if (!shared->done) {
-                  shared->timed_out = true;
-                  shared->done = true;
-               }
-            }
-            shared->ready.notify_all();
-         }
-      },
-      boost::asio::detached);
+       runtime.context(),
+       [shared, timer]() -> boost::asio::awaitable<void> {
+          auto error = boost::system::error_code{};
+          co_await timer->async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, error));
+          if (!error) {
+             {
+                const auto lock = std::scoped_lock{shared->mutex};
+                if (!shared->done) {
+                   shared->timed_out = true;
+                   shared->done = true;
+                }
+             }
+             shared->ready.notify_all();
+          }
+       },
+       boost::asio::detached);
 
    auto lock = std::unique_lock{shared->mutex};
-   shared->ready.wait(lock, [&] {
-      return shared->done;
-   });
+   shared->ready.wait(lock, [&] { return shared->done; });
 
    if (shared->timed_out) {
       return false;

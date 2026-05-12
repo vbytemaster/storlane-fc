@@ -13,6 +13,7 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Public module files live under `libraries/<lib>/include/fcl/<lib>/*.cppm`.
 - Public module declarations should use explicit `export namespace fcl... { ... }`; broad `export { ... }` blocks are forbidden unless a narrow compiler-proven exception is documented next to the code.
 - Use C++17 nested namespace syntax (`namespace fcl::raw { ... }`), not legacy nested braces (`namespace fcl { namespace raw { ... } }`).
+- Indentation is 3 spaces per level. Hard tabs are forbidden.
 - Public `.hpp` / `.h` files under `include/fcl` are forbidden except macro-only headers. Macro-only headers must not declare public types, functions, templates or old header-wrapper APIs.
 - Do not create nested public include directories under `include/fcl/<lib>`.
 - Do not use `import std;` until the supported toolchain and CI explicitly prove it is stable.

@@ -50,56 +50,54 @@ namespace {
 using udp = boost::asio::ip::udp;
 
 std::string_view test_certificate() {
-   return
-      "-----BEGIN CERTIFICATE-----\n"
-      "MIICpDCCAYwCCQCJjaEDxrQqBzANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAkx\n"
-      "MjcuMC4wLjEwHhcNMjYwNDI5MDgwMTMzWhcNMjYwNDMwMDgwMTMzWjAUMRIwEAYD\n"
-      "VQQDDAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDy\n"
-      "sbPH/R4QUz725sY376knXjSDCA+O5+Udwqfl4qaXHTAooWfplVY/WFRCnnMV6+TX\n"
-      "gl9tHkNpKmI92s4O/LuJ5xnCCPX8k5i70gSnaGpClYSx+0gix8QgddDDsbLbIU/+\n"
-      "x7MRWXfKYd/ArGNelPMadlvmcoEhumVUAwjYSV26GhNAmUacJlho3ltyujYSGFOS\n"
-      "lI/lDqIjZxo7jbAGMMpiyu1omQ5nxjTm+bfOTcksBRMQP8mDz0vYXHXirA+xDfuv\n"
-      "M+mTj6eO4UQ42w+iVLqhSPEhfLURmR4NULtPmq9hT7d1wS/Ys9q4Hj/j+kcXRCXj\n"
-      "nPOZzBinLRTDnE59HbDZAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAHSOUQTEDgjC\n"
-      "uwza9ayfThJTs43j+TziWHLlowqCiHt/ipRNFEW7L0ibTnbMdQBFGfaLkTAhc5Rd\n"
-      "6O6x+9o76pgEYxEg0rDkgNXmprNmS+nL7Are+iiF6R+X8dts3MQgtONPApAXE96P\n"
-      "/n5K4GDQTd3WCI37hkmJA6rmwziFDTlwqtKWts39g8PqAbXac27rVR/iD0gWdOws\n"
-      "qiaoGj/0WW9qcgjYGdCc0/CbbnyiWbi48VVf0yyfm7wgcz90byaKIQchHdb/qjyU\n"
-      "wy7nfU5TJ5MKQ5yeqPTWmPYZZp9TKa5VD6wZD/IH7jH3GdJ/fSyroVLZktVnmxJa\n"
-      "dmG/9wwivwQ=\n"
-      "-----END CERTIFICATE-----\n";
+   return "-----BEGIN CERTIFICATE-----\n"
+          "MIICpDCCAYwCCQCJjaEDxrQqBzANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAkx\n"
+          "MjcuMC4wLjEwHhcNMjYwNDI5MDgwMTMzWhcNMjYwNDMwMDgwMTMzWjAUMRIwEAYD\n"
+          "VQQDDAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDy\n"
+          "sbPH/R4QUz725sY376knXjSDCA+O5+Udwqfl4qaXHTAooWfplVY/WFRCnnMV6+TX\n"
+          "gl9tHkNpKmI92s4O/LuJ5xnCCPX8k5i70gSnaGpClYSx+0gix8QgddDDsbLbIU/+\n"
+          "x7MRWXfKYd/ArGNelPMadlvmcoEhumVUAwjYSV26GhNAmUacJlho3ltyujYSGFOS\n"
+          "lI/lDqIjZxo7jbAGMMpiyu1omQ5nxjTm+bfOTcksBRMQP8mDz0vYXHXirA+xDfuv\n"
+          "M+mTj6eO4UQ42w+iVLqhSPEhfLURmR4NULtPmq9hT7d1wS/Ys9q4Hj/j+kcXRCXj\n"
+          "nPOZzBinLRTDnE59HbDZAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAHSOUQTEDgjC\n"
+          "uwza9ayfThJTs43j+TziWHLlowqCiHt/ipRNFEW7L0ibTnbMdQBFGfaLkTAhc5Rd\n"
+          "6O6x+9o76pgEYxEg0rDkgNXmprNmS+nL7Are+iiF6R+X8dts3MQgtONPApAXE96P\n"
+          "/n5K4GDQTd3WCI37hkmJA6rmwziFDTlwqtKWts39g8PqAbXac27rVR/iD0gWdOws\n"
+          "qiaoGj/0WW9qcgjYGdCc0/CbbnyiWbi48VVf0yyfm7wgcz90byaKIQchHdb/qjyU\n"
+          "wy7nfU5TJ5MKQ5yeqPTWmPYZZp9TKa5VD6wZD/IH7jH3GdJ/fSyroVLZktVnmxJa\n"
+          "dmG/9wwivwQ=\n"
+          "-----END CERTIFICATE-----\n";
 }
 
 std::string_view test_private_key() {
-   return
-      "-----BEGIN PRIVATE KEY-----\n"
-      "MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDysbPH/R4QUz72\n"
-      "5sY376knXjSDCA+O5+Udwqfl4qaXHTAooWfplVY/WFRCnnMV6+TXgl9tHkNpKmI9\n"
-      "2s4O/LuJ5xnCCPX8k5i70gSnaGpClYSx+0gix8QgddDDsbLbIU/+x7MRWXfKYd/A\n"
-      "rGNelPMadlvmcoEhumVUAwjYSV26GhNAmUacJlho3ltyujYSGFOSlI/lDqIjZxo7\n"
-      "jbAGMMpiyu1omQ5nxjTm+bfOTcksBRMQP8mDz0vYXHXirA+xDfuvM+mTj6eO4UQ4\n"
-      "2w+iVLqhSPEhfLURmR4NULtPmq9hT7d1wS/Ys9q4Hj/j+kcXRCXjnPOZzBinLRTD\n"
-      "nE59HbDZAgMBAAECggEBAIWVjHhy+V5RA+JRCh/12ayirNLG2BF30OP9pf7iL4IT\n"
-      "/dMPbKvkmDGLw+1bW8tgKXj5+N6N/trfCm4zhqI3OF7ihooH9qYM88/F/OvMjFiU\n"
-      "BhMVVhJW1LxtPPjKUcFN58M8VnMhRM9v6gIaoSOJZvpU1abVtgBDocyJUxAB6gYp\n"
-      "i7MzoRwHGsL5mW/luE5H92/S8NNwLWBDA7DIGfrTZ6POf92h5I5W3CuTcqR5FICz\n"
-      "3pfU3i443yZmsmkc9duH2gZ9cb9j4pRtNLbbsGmRVrBlgnkVFk8JWbikc8MpLeKO\n"
-      "VKP7A2NvxJIrc7oFYrf4hbw8P70YL7S9B3W3yBPPzJECgYEA+Y3nG8CtvVTE/Keo\n"
-      "qb5Rljlnj9DEffrylLyYUYfSSNR4Olc2WCPBiz0rPCDdO0VGeXAwqLf2VP7IEyAx\n"
-      "kvrnqhzHWMhiLv+k4tIVyKCwpuofN0JsoUCi7CwRf+H2Pg+t6ewLV116THKsd41H\n"
-      "IRElWyEvZsmbbhlLrsxUtfFZWnUCgYEA+PZwXUn+cb8kRmfG959gMawTtcfvnBUX\n"
-      "sIn7LQl/ZWUIiLMWCaS3FbqkiGjaEYo6om1invYNJNA9zp/ECauSDp58NICCL0ie\n"
-      "L7z26sEa6Ocg2VdR4ezpN3cM6dyAKfTFGb9V6qjyqNIPCE4eey6ZJ+CU/mpEfSDu\n"
-      "+RGMzfdDCFUCgYEA5FRUn0zk6jU0YyMXq+9pgLSXL7vI/Kdt6m7AQuCto1tbga2o\n"
-      "GG7mt/pIo6RCJufUemoO62AeL1hKQU2UbjHJYxkfv/jf9LaM68dijQWRe7b8xres\n"
-      "4sFcEBCmFkbt4YzBCCWjntT1gBrv+Ba4fOXOMxoi374Yy1yzpYRpAWuI4L0CgYAn\n"
-      "u1SlXrivuHx2i/tR62pzou2mVhkkRK16LBsczeY57UzWXBZJRbM+UYIOjwU2RWQk\n"
-      "JebWTZg9ZspmXlLv5CS0FpDl5BhiqWktXy/cuSKtRq2UYf4cWy3A/0vdSqZdi8Wk\n"
-      "3Uc94uaPEK77eVQd/orMtWexzo3NlmLs9uMMv8g/3QKBgQCbik0UoJkkqNRMmWG8\n"
-      "dKQzj58eRI8fmKdJlWNfj2QMspd2vXMbsWYgAbFbU1QcVs1n8PxNydM+cfy77w8q\n"
-      "NWMlYP7rUFQ3ekYWqrRlshZdJ/h24PALd1nPCvhc4C9dvn+zW3BLVez1lBuFO8n8\n"
-      "0YkgmTgW7Ieibqnf4DqYp//nkw==\n"
-      "-----END PRIVATE KEY-----\n";
+   return "-----BEGIN PRIVATE KEY-----\n"
+          "MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDysbPH/R4QUz72\n"
+          "5sY376knXjSDCA+O5+Udwqfl4qaXHTAooWfplVY/WFRCnnMV6+TXgl9tHkNpKmI9\n"
+          "2s4O/LuJ5xnCCPX8k5i70gSnaGpClYSx+0gix8QgddDDsbLbIU/+x7MRWXfKYd/A\n"
+          "rGNelPMadlvmcoEhumVUAwjYSV26GhNAmUacJlho3ltyujYSGFOSlI/lDqIjZxo7\n"
+          "jbAGMMpiyu1omQ5nxjTm+bfOTcksBRMQP8mDz0vYXHXirA+xDfuvM+mTj6eO4UQ4\n"
+          "2w+iVLqhSPEhfLURmR4NULtPmq9hT7d1wS/Ys9q4Hj/j+kcXRCXjnPOZzBinLRTD\n"
+          "nE59HbDZAgMBAAECggEBAIWVjHhy+V5RA+JRCh/12ayirNLG2BF30OP9pf7iL4IT\n"
+          "/dMPbKvkmDGLw+1bW8tgKXj5+N6N/trfCm4zhqI3OF7ihooH9qYM88/F/OvMjFiU\n"
+          "BhMVVhJW1LxtPPjKUcFN58M8VnMhRM9v6gIaoSOJZvpU1abVtgBDocyJUxAB6gYp\n"
+          "i7MzoRwHGsL5mW/luE5H92/S8NNwLWBDA7DIGfrTZ6POf92h5I5W3CuTcqR5FICz\n"
+          "3pfU3i443yZmsmkc9duH2gZ9cb9j4pRtNLbbsGmRVrBlgnkVFk8JWbikc8MpLeKO\n"
+          "VKP7A2NvxJIrc7oFYrf4hbw8P70YL7S9B3W3yBPPzJECgYEA+Y3nG8CtvVTE/Keo\n"
+          "qb5Rljlnj9DEffrylLyYUYfSSNR4Olc2WCPBiz0rPCDdO0VGeXAwqLf2VP7IEyAx\n"
+          "kvrnqhzHWMhiLv+k4tIVyKCwpuofN0JsoUCi7CwRf+H2Pg+t6ewLV116THKsd41H\n"
+          "IRElWyEvZsmbbhlLrsxUtfFZWnUCgYEA+PZwXUn+cb8kRmfG959gMawTtcfvnBUX\n"
+          "sIn7LQl/ZWUIiLMWCaS3FbqkiGjaEYo6om1invYNJNA9zp/ECauSDp58NICCL0ie\n"
+          "L7z26sEa6Ocg2VdR4ezpN3cM6dyAKfTFGb9V6qjyqNIPCE4eey6ZJ+CU/mpEfSDu\n"
+          "+RGMzfdDCFUCgYEA5FRUn0zk6jU0YyMXq+9pgLSXL7vI/Kdt6m7AQuCto1tbga2o\n"
+          "GG7mt/pIo6RCJufUemoO62AeL1hKQU2UbjHJYxkfv/jf9LaM68dijQWRe7b8xres\n"
+          "4sFcEBCmFkbt4YzBCCWjntT1gBrv+Ba4fOXOMxoi374Yy1yzpYRpAWuI4L0CgYAn\n"
+          "u1SlXrivuHx2i/tR62pzou2mVhkkRK16LBsczeY57UzWXBZJRbM+UYIOjwU2RWQk\n"
+          "JebWTZg9ZspmXlLv5CS0FpDl5BhiqWktXy/cuSKtRq2UYf4cWy3A/0vdSqZdi8Wk\n"
+          "3Uc94uaPEK77eVQd/orMtWexzo3NlmLs9uMMv8g/3QKBgQCbik0UoJkkqNRMmWG8\n"
+          "dKQzj58eRI8fmKdJlWNfj2QMspd2vXMbsWYgAbFbU1QcVs1n8PxNydM+cfy77w8q\n"
+          "NWMlYP7rUFQ3ekYWqrRlshZdJ/h24PALd1nPCvhc4C9dvn+zW3BLVez1lBuFO8n8\n"
+          "0YkgmTgW7Ieibqnf4DqYp//nkw==\n"
+          "-----END PRIVATE KEY-----\n";
 }
 
 struct bio_deleter {
@@ -143,7 +141,7 @@ void add_certificate_extension(X509* certificate, int nid, std::string_view valu
    X509V3_set_ctx_nodb(&context);
    X509V3_set_ctx(&context, certificate, certificate, nullptr, nullptr, 0);
    auto extension = std::unique_ptr<X509_EXTENSION, x509_extension_deleter>{
-      X509V3_EXT_conf_nid(nullptr, &context, nid, std::string{value}.c_str())};
+       X509V3_EXT_conf_nid(nullptr, &context, nid, std::string{value}.c_str())};
    BOOST_REQUIRE(extension != nullptr);
    BOOST_REQUIRE(X509_add_ext(certificate, extension.get(), -1) == 1);
 }
@@ -162,14 +160,9 @@ generated_identity generate_test_identity(std::string_view subject_alt_name) {
    auto* name = X509_get_subject_name(certificate.get());
    BOOST_REQUIRE(name != nullptr);
    const auto common_name = std::string{"fcl-quic-test"};
-   BOOST_REQUIRE(X509_NAME_add_entry_by_txt(
-                    name,
-                    "CN",
-                    MBSTRING_ASC,
-                    reinterpret_cast<const unsigned char*>(common_name.data()),
-                    static_cast<int>(common_name.size()),
-                    -1,
-                    0) == 1);
+   BOOST_REQUIRE(X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                                            reinterpret_cast<const unsigned char*>(common_name.data()),
+                                            static_cast<int>(common_name.size()), -1, 0) == 1);
    BOOST_REQUIRE(X509_set_issuer_name(certificate.get(), name) == 1);
    add_certificate_extension(certificate.get(), NID_basic_constraints, "critical,CA:TRUE");
    add_certificate_extension(certificate.get(), NID_subject_alt_name, subject_alt_name);
@@ -180,10 +173,11 @@ generated_identity generate_test_identity(std::string_view subject_alt_name) {
    BOOST_REQUIRE(certificate_bio != nullptr);
    BOOST_REQUIRE(private_key_bio != nullptr);
    BOOST_REQUIRE(PEM_write_bio_X509(certificate_bio.get(), certificate.get()) == 1);
-   BOOST_REQUIRE(PEM_write_bio_PrivateKey(private_key_bio.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr) == 1);
+   BOOST_REQUIRE(PEM_write_bio_PrivateKey(private_key_bio.get(), key.get(), nullptr, nullptr, 0, nullptr, nullptr) ==
+                 1);
    return generated_identity{
-      .certificate_pem = bio_to_string(certificate_bio.get()),
-      .private_key_pem = bio_to_string(private_key_bio.get()),
+       .certificate_pem = bio_to_string(certificate_bio.get()),
+       .private_key_pem = bio_to_string(private_key_bio.get()),
    };
 }
 
@@ -198,7 +192,8 @@ struct scoped_quic_connect_failpoint {
 };
 
 std::vector<std::uint8_t> test_certificate_der() {
-   auto bio = std::unique_ptr<BIO, bio_deleter>{BIO_new_mem_buf(test_certificate().data(), static_cast<int>(test_certificate().size()))};
+   auto bio = std::unique_ptr<BIO, bio_deleter>{
+       BIO_new_mem_buf(test_certificate().data(), static_cast<int>(test_certificate().size()))};
    BOOST_REQUIRE(bio != nullptr);
    auto certificate = std::unique_ptr<X509, x509_deleter>{PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr)};
    BOOST_REQUIRE(certificate != nullptr);
@@ -213,20 +208,20 @@ std::vector<std::uint8_t> test_certificate_der() {
 
 server_options loopback_server_options(std::string alpn = "fcl-p2p/1", transport_limits limits = {}) {
    return server_options{
-      .alpn = std::move(alpn),
-      .limits = limits,
-      .security = security_options{.verify_peer = false},
-      .certificate_pem = std::string{test_certificate()},
-      .private_key_pem = std::string{test_private_key()},
+       .alpn = std::move(alpn),
+       .limits = limits,
+       .security = security_options{.verify_peer = false},
+       .certificate_pem = std::string{test_certificate()},
+       .private_key_pem = std::string{test_private_key()},
    };
 }
 
 client_options loopback_client_options(std::string alpn = "fcl-p2p/1", transport_limits limits = {}) {
    return client_options{
-      .alpn = std::move(alpn),
-      .handshake_timeout = std::chrono::milliseconds{5'000},
-      .limits = limits,
-      .security = security_options{.verify_peer = false},
+       .alpn = std::move(alpn),
+       .handshake_timeout = std::chrono::milliseconds{5'000},
+       .limits = limits,
+       .security = security_options{.verify_peer = false},
    };
 }
 
@@ -256,11 +251,8 @@ void get_with_deadline(std::future<void>& future, std::chrono::milliseconds time
 }
 
 template <typename Awaitable>
-auto run_with_deadline(
-   fcl::asio::runtime& runtime,
-   Awaitable&& awaitable,
-   std::chrono::milliseconds timeout,
-   std::string_view label) {
+auto run_with_deadline(fcl::asio::runtime& runtime, Awaitable&& awaitable, std::chrono::milliseconds timeout,
+                       std::string_view label) {
    auto future = boost::asio::co_spawn(runtime.context(), std::forward<Awaitable>(awaitable), boost::asio::use_future);
    return get_with_deadline(future, timeout, label);
 }
@@ -295,11 +287,10 @@ struct fault_proxy_metrics {
 };
 
 class udp_fault_proxy : public std::enable_shared_from_this<udp_fault_proxy> {
-public:
+ public:
    udp_fault_proxy(boost::asio::io_context& context, endpoint server_endpoint, fault_proxy_rules rules)
-      : socket_(context, udp::endpoint{boost::asio::ip::make_address("127.0.0.1"), 0})
-      , server_endpoint_(to_udp_endpoint(server_endpoint))
-      , rules_(rules) {}
+       : socket_(context, udp::endpoint{boost::asio::ip::make_address("127.0.0.1"), 0}),
+         server_endpoint_(to_udp_endpoint(server_endpoint)), rules_(rules) {}
 
    ~udp_fault_proxy() {
       stop();
@@ -330,7 +321,7 @@ public:
       socket_.close(ignored);
    }
 
-private:
+ private:
    struct packet {
       std::vector<std::uint8_t> bytes;
       udp::endpoint destination;
@@ -344,16 +335,14 @@ private:
 
    void do_receive() {
       auto self = shared_from_this();
-      socket_.async_receive_from(
-         boost::asio::buffer(buffer_),
-         source_endpoint_,
-         [self](boost::system::error_code ec, std::size_t bytes) {
-            if (ec || self->stopped_) {
-               return;
-            }
-            self->handle_packet(bytes);
-            self->do_receive();
-         });
+      socket_.async_receive_from(boost::asio::buffer(buffer_), source_endpoint_,
+                                 [self](boost::system::error_code ec, std::size_t bytes) {
+                                    if (ec || self->stopped_) {
+                                       return;
+                                    }
+                                    self->handle_packet(bytes);
+                                    self->do_receive();
+                                 });
    }
 
    void handle_packet(std::size_t bytes) {
@@ -367,9 +356,9 @@ private:
       }
 
       auto packet_value = packet{
-         .bytes = std::vector<std::uint8_t>{buffer_.begin(), buffer_.begin() + static_cast<std::ptrdiff_t>(bytes)},
-         .destination = from_server ? client_endpoint_ : server_endpoint_,
-         .to_server = !from_server,
+          .bytes = std::vector<std::uint8_t>{buffer_.begin(), buffer_.begin() + static_cast<std::ptrdiff_t>(bytes)},
+          .destination = from_server ? client_endpoint_ : server_endpoint_,
+          .to_server = !from_server,
       };
       route_packet(std::move(packet_value));
    }
@@ -386,12 +375,15 @@ private:
          return;
       }
 
-      const auto duplicate = rule.duplicate_every > 0 && state.sequence > rule.duplicate_after && state.sequence % rule.duplicate_every == 0;
+      const auto duplicate = rule.duplicate_every > 0 && state.sequence > rule.duplicate_after &&
+                             state.sequence % rule.duplicate_every == 0;
       if (rule.reorder_every > 0 && state.sequence > rule.reorder_after && state.sequence % rule.reorder_every == 0) {
          if (!state.reordered) {
             ++metrics.reordered;
             state.reordered = std::move(packet_value);
-            schedule_reorder_flush(state, metrics, rule.delay == std::chrono::milliseconds{0} ? std::chrono::milliseconds{5} : rule.delay * 2);
+            schedule_reorder_flush(state, metrics,
+                                   rule.delay == std::chrono::milliseconds{0} ? std::chrono::milliseconds{5}
+                                                                              : rule.delay * 2);
             return;
          }
       }
@@ -399,7 +391,10 @@ private:
       send_or_delay(packet_value, rule, metrics);
       if (duplicate) {
          ++metrics.duplicated;
-         send_or_delay(packet{.bytes = packet_value.bytes, .destination = packet_value.destination, .to_server = packet_value.to_server}, rule, metrics);
+         send_or_delay(packet{.bytes = packet_value.bytes,
+                              .destination = packet_value.destination,
+                              .to_server = packet_value.to_server},
+                       rule, metrics);
       }
       if (state.reordered) {
          auto held = std::move(*state.reordered);
@@ -408,7 +403,8 @@ private:
       }
    }
 
-   void schedule_reorder_flush(direction_state& state, fault_direction_metrics& metrics, std::chrono::milliseconds delay) {
+   void schedule_reorder_flush(direction_state& state, fault_direction_metrics& metrics,
+                               std::chrono::milliseconds delay) {
       auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
       timer->expires_after(delay);
       auto self = shared_from_this();
@@ -434,26 +430,25 @@ private:
       timer->expires_after(rule.delay);
       auto self = shared_from_this();
       auto metrics_ptr = &metrics;
-      timer->async_wait([self, timer, packet_value = std::move(packet_value), metrics_ptr](boost::system::error_code ec) mutable {
-         if (ec || self->stopped_) {
-            return;
-         }
-         self->send_now(std::move(packet_value), *metrics_ptr);
-      });
+      timer->async_wait(
+          [self, timer, packet_value = std::move(packet_value), metrics_ptr](boost::system::error_code ec) mutable {
+             if (ec || self->stopped_) {
+                return;
+             }
+             self->send_now(std::move(packet_value), *metrics_ptr);
+          });
    }
 
    void send_now(packet packet_value, fault_direction_metrics& metrics) {
       auto self = shared_from_this();
       auto payload = std::make_shared<std::vector<std::uint8_t>>(std::move(packet_value.bytes));
       auto* metrics_ptr = &metrics;
-      socket_.async_send_to(
-         boost::asio::buffer(*payload),
-         packet_value.destination,
-         [self, payload, metrics_ptr](boost::system::error_code ec, std::size_t) {
-            if (!ec) {
-               ++metrics_ptr->sent;
-            }
-         });
+      socket_.async_send_to(boost::asio::buffer(*payload), packet_value.destination,
+                            [self, payload, metrics_ptr](boost::system::error_code ec, std::size_t) {
+                               if (!ec) {
+                                  ++metrics_ptr->sent;
+                               }
+                            });
    }
 
    udp::socket socket_;
@@ -501,12 +496,9 @@ BOOST_AUTO_TEST_CASE(quic_connect_timeout_wins_over_pre_connection_error_race) {
 
    try {
       (void)run_with_deadline(
-         runtime,
-         client.async_connect(
-            endpoint{.host = "not a valid host name", .port = 443},
-            loopback_client_options()),
-         std::chrono::milliseconds{2'000},
-         "pre-connection error timeout winner");
+          runtime,
+          client.async_connect(endpoint{.host = "not a valid host name", .port = 443}, loopback_client_options()),
+          std::chrono::milliseconds{2'000}, "pre-connection error timeout winner");
       BOOST_FAIL("expected QUIC connect timeout");
    } catch (const quic_error& error) {
       BOOST_TEST(static_cast<int>(error.kind()) == static_cast<int>(error_kind::connect_timeout));
@@ -546,7 +538,8 @@ BOOST_AUTO_TEST_CASE(quic_frame_codec_rejects_oversized_payload) {
 }
 
 BOOST_AUTO_TEST_CASE(quic_security_normalizes_fingerprint) {
-   const auto raw = std::string{"AA:BB:CC:DD:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB"};
+   const auto raw =
+       std::string{"AA:BB:CC:DD:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB"};
    const auto normalized = normalize_sha256_fingerprint(raw);
 
    BOOST_TEST(normalized == "aabbccdd00112233445566778899aabbccddeeff00112233445566778899aabb");
@@ -585,30 +578,28 @@ BOOST_AUTO_TEST_CASE(quic_runtime_initializes_ngtcp2_crypto_ossl) {
 BOOST_AUTO_TEST_CASE(quic_loopback_handshake_and_echo_frame_over_udp) {
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
    auto server = listener{
-      runtime,
-      endpoint{.host = "127.0.0.1", .port = 0},
-      loopback_server_options(),
+       runtime,
+       endpoint{.host = "127.0.0.1", .port = 0},
+       loopback_server_options(),
    };
 
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(
-      runtime,
-      client.async_connect(
-         server.local_endpoint(),
-         loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
 
    auto server_echo = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::vector<std::uint8_t>> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         auto request = co_await framed.async_read_frame();
-         co_await framed.async_write_frame(request);
-         co_return request;
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection =
+            std::move(server_connection)]() mutable -> boost::asio::awaitable<std::vector<std::uint8_t>> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          auto request = co_await framed.async_read_frame();
+          co_await framed.async_write_frame(request);
+          co_return request;
+       },
+       boost::asio::use_future);
 
    auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
    auto framed = framed_stream{std::move(client_stream)};
@@ -631,26 +622,28 @@ BOOST_AUTO_TEST_CASE(quic_loopback_medium_frame_and_small_frame_burst) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
 
    constexpr auto small_frame_count = 10'000U;
    auto server_task = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::pair<std::size_t, std::size_t>> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         auto large = co_await framed.async_read_frame();
-         co_await framed.async_write_frame(large);
+       runtime.context(),
+       [server_connection =
+            std::move(server_connection)]() mutable -> boost::asio::awaitable<std::pair<std::size_t, std::size_t>> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          auto large = co_await framed.async_read_frame();
+          co_await framed.async_write_frame(large);
 
-         auto small_seen = std::size_t{0};
-         for (auto index = 0U; index < small_frame_count; ++index) {
-            auto frame = co_await framed.async_read_frame();
-            small_seen += frame.size();
-         }
-         co_return std::pair{large.size(), small_seen};
-      },
-      boost::asio::use_future);
+          auto small_seen = std::size_t{0};
+          for (auto index = 0U; index < small_frame_count; ++index) {
+             auto frame = co_await framed.async_read_frame();
+             small_seen += frame.size();
+          }
+          co_return std::pair{large.size(), small_seen};
+       },
+       boost::asio::use_future);
 
    auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
    auto framed = framed_stream{std::move(client_stream)};
@@ -662,14 +655,12 @@ BOOST_AUTO_TEST_CASE(quic_loopback_medium_frame_and_small_frame_burst) {
    const auto large_reply = fcl::asio::blocking::run(runtime, framed.async_read_frame());
    BOOST_TEST(large_reply == large_payload, boost::test_tools::per_element());
 
-   fcl::asio::blocking::run(
-      runtime,
-      [&framed]() -> boost::asio::awaitable<void> {
-         for (auto index = 0U; index < small_frame_count; ++index) {
-            const auto payload = std::vector<std::uint8_t>{static_cast<std::uint8_t>(index & 0xffU)};
-            co_await framed.async_write_frame(payload);
-         }
-      }());
+   fcl::asio::blocking::run(runtime, [&framed]() -> boost::asio::awaitable<void> {
+      for (auto index = 0U; index < small_frame_count; ++index) {
+         const auto payload = std::vector<std::uint8_t>{static_cast<std::uint8_t>(index & 0xffU)};
+         co_await framed.async_write_frame(payload);
+      }
+   }());
    const auto [large_seen, small_seen] = server_task.get();
 
    BOOST_TEST(large_seen == large_payload.size());
@@ -686,20 +677,21 @@ BOOST_AUTO_TEST_CASE(quic_loopback_large_frame_over_real_quic_stream) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
 
    auto server_echo = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         auto request = co_await framed.async_read_frame();
-         const auto size = request.size();
-         co_await framed.async_write_frame(request);
-         co_return size;
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          auto request = co_await framed.async_read_frame();
+          const auto size = request.size();
+          co_await framed.async_write_frame(request);
+          co_return size;
+       },
+       boost::asio::use_future);
 
    auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
    auto framed = framed_stream{std::move(client_stream)};
@@ -721,62 +713,63 @@ BOOST_AUTO_TEST_CASE(quic_loopback_large_frame_over_real_quic_stream) {
 }
 
 BOOST_AUTO_TEST_CASE(quic_loopback_many_parallel_streams_echo_frames) {
-   auto limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 64, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 64, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
+   auto client_connection = fcl::asio::blocking::run(
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
    auto server_connection = accept_future.get();
 
    constexpr auto stream_count = 32U;
    auto server_echo = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
-         auto total = std::size_t{0};
-         for (auto index = 0U; index < stream_count; ++index) {
-            auto accepted = co_await server_connection.async_accept_stream();
-            auto framed = framed_stream{std::move(accepted)};
-            auto request = co_await framed.async_read_frame();
-            total += request.size();
-            co_await framed.async_write_frame(request);
-         }
-         co_return total;
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
+          auto total = std::size_t{0};
+          for (auto index = 0U; index < stream_count; ++index) {
+             auto accepted = co_await server_connection.async_accept_stream();
+             auto framed = framed_stream{std::move(accepted)};
+             auto request = co_await framed.async_read_frame();
+             total += request.size();
+             co_await framed.async_write_frame(request);
+          }
+          co_return total;
+       },
+       boost::asio::use_future);
 
    auto replies = fcl::asio::blocking::run(
-      runtime,
-      [&client_connection]() mutable -> boost::asio::awaitable<std::vector<std::vector<std::uint8_t>>> {
-         auto streams = std::vector<framed_stream>{};
-         auto expected = std::vector<std::vector<std::uint8_t>>{};
-         streams.reserve(stream_count);
-         expected.reserve(stream_count);
-         for (auto index = 0U; index < stream_count; ++index) {
-            auto stream_value = co_await client_connection.async_open_stream();
-            streams.emplace_back(framed_stream{std::move(stream_value)});
-            auto payload = std::vector<std::uint8_t>(128U + index);
-            std::fill(payload.begin(), payload.end(), static_cast<std::uint8_t>(index));
-            co_await streams.back().async_write_frame(payload);
-            expected.push_back(std::move(payload));
-         }
+       runtime, [&client_connection]() mutable -> boost::asio::awaitable<std::vector<std::vector<std::uint8_t>>> {
+          auto streams = std::vector<framed_stream>{};
+          auto expected = std::vector<std::vector<std::uint8_t>>{};
+          streams.reserve(stream_count);
+          expected.reserve(stream_count);
+          for (auto index = 0U; index < stream_count; ++index) {
+             auto stream_value = co_await client_connection.async_open_stream();
+             streams.emplace_back(framed_stream{std::move(stream_value)});
+             auto payload = std::vector<std::uint8_t>(128U + index);
+             std::fill(payload.begin(), payload.end(), static_cast<std::uint8_t>(index));
+             co_await streams.back().async_write_frame(payload);
+             expected.push_back(std::move(payload));
+          }
 
-         auto replies = std::vector<std::vector<std::uint8_t>>{};
-         replies.reserve(stream_count);
-         for (auto& stream_value : streams) {
-            replies.push_back(co_await stream_value.async_read_frame());
-         }
-         co_return replies;
-      }());
+          auto replies = std::vector<std::vector<std::uint8_t>>{};
+          replies.reserve(stream_count);
+          for (auto& stream_value : streams) {
+             replies.push_back(co_await stream_value.async_read_frame());
+          }
+          co_return replies;
+       }());
    const auto server_total = server_echo.get();
 
    auto expected_total = std::size_t{0};
    for (auto index = 0U; index < stream_count; ++index) {
       expected_total += 128U + index;
       BOOST_TEST(replies[index].size() == 128U + index);
-      BOOST_TEST(std::all_of(replies[index].begin(), replies[index].end(), [index](std::uint8_t value) {
-         return value == static_cast<std::uint8_t>(index);
-      }));
+      BOOST_TEST(std::all_of(replies[index].begin(), replies[index].end(),
+                             [index](std::uint8_t value) { return value == static_cast<std::uint8_t>(index); }));
    }
    BOOST_TEST(server_total == expected_total);
    BOOST_TEST(client_connection.metrics().streams_opened == stream_count);
@@ -794,18 +787,19 @@ BOOST_AUTO_TEST_CASE(quic_loopback_repeated_connect_transfer_close_soak) {
       auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
       auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
       auto client = connector{runtime};
-      auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+      auto client_connection =
+          fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
       auto server_connection = accept_future.get();
 
       auto server_echo = boost::asio::co_spawn(
-         runtime.context(),
-         [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
-            auto accepted = co_await server_connection.async_accept_stream();
-            auto framed = framed_stream{std::move(accepted)};
-            auto request = co_await framed.async_read_frame();
-            co_await framed.async_write_frame(request);
-         },
-         boost::asio::use_future);
+          runtime.context(),
+          [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
+             auto accepted = co_await server_connection.async_accept_stream();
+             auto framed = framed_stream{std::move(accepted)};
+             auto request = co_await framed.async_read_frame();
+             co_await framed.async_write_frame(request);
+          },
+          boost::asio::use_future);
 
       auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
       auto framed = framed_stream{std::move(client_stream)};
@@ -821,95 +815,99 @@ BOOST_AUTO_TEST_CASE(quic_loopback_repeated_connect_transfer_close_soak) {
 }
 
 BOOST_AUTO_TEST_CASE(quic_fault_proxy_handshake_survives_mild_loss) {
-   auto limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto proxy = std::make_shared<udp_fault_proxy>(
-      runtime.context(),
-      server.local_endpoint(),
-      fault_proxy_rules{
-         .client_to_server = fault_rule{.drop_every = 7, .delay = std::chrono::milliseconds{1}},
-         .server_to_client = fault_rule{.drop_every = 7, .delay = std::chrono::milliseconds{1}},
-      });
+       runtime.context(), server.local_endpoint(),
+       fault_proxy_rules{
+           .client_to_server = fault_rule{.drop_every = 7, .delay = std::chrono::milliseconds{1}},
+           .server_to_client = fault_rule{.drop_every = 7, .delay = std::chrono::milliseconds{1}},
+       });
    proxy->start();
 
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
    auto client_connection = run_with_deadline(
-      runtime,
-      client.async_connect(proxy->local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
-      std::chrono::milliseconds{10'000},
-      "lossy handshake connect");
-   auto server_connection = get_with_deadline(accept_future, std::chrono::milliseconds{10'000}, "lossy handshake accept");
+       runtime, client.async_connect(proxy->local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
+       std::chrono::milliseconds{10'000}, "lossy handshake connect");
+   auto server_connection =
+       get_with_deadline(accept_future, std::chrono::milliseconds{10'000}, "lossy handshake accept");
    const auto proxy_metrics = proxy->metrics();
 
    BOOST_TEST(client_connection.valid());
    BOOST_TEST(server_connection.valid());
    BOOST_TEST(proxy_metrics.client_to_server.dropped + proxy_metrics.server_to_client.dropped > 0U);
 
-   run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000}, "lossy handshake close");
+   run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000},
+                     "lossy handshake close");
    proxy->stop();
    server.stop();
 }
 
 BOOST_AUTO_TEST_CASE(quic_fault_proxy_framed_echo_survives_loss_delay_reorder_duplicate) {
-   auto limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
-   auto proxy = std::make_shared<udp_fault_proxy>(
-      runtime.context(),
-      server.local_endpoint(),
-      fault_proxy_rules{
-         .client_to_server = fault_rule{
-            .drop_every = 53,
-            .drop_after = 16,
-            .duplicate_every = 17,
-            .duplicate_after = 8,
-            .reorder_every = 23,
-            .reorder_after = 8,
-            .delay = std::chrono::milliseconds{1},
-         },
-         .server_to_client = fault_rule{
-            .drop_every = 59,
-            .drop_after = 16,
-            .duplicate_every = 19,
-            .duplicate_after = 8,
-            .reorder_every = 29,
-            .reorder_after = 8,
-            .delay = std::chrono::milliseconds{1},
-         },
-      });
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto proxy = std::make_shared<udp_fault_proxy>(runtime.context(), server.local_endpoint(),
+                                                  fault_proxy_rules{
+                                                      .client_to_server =
+                                                          fault_rule{
+                                                              .drop_every = 53,
+                                                              .drop_after = 16,
+                                                              .duplicate_every = 17,
+                                                              .duplicate_after = 8,
+                                                              .reorder_every = 23,
+                                                              .reorder_after = 8,
+                                                              .delay = std::chrono::milliseconds{1},
+                                                          },
+                                                      .server_to_client =
+                                                          fault_rule{
+                                                              .drop_every = 59,
+                                                              .drop_after = 16,
+                                                              .duplicate_every = 19,
+                                                              .duplicate_after = 8,
+                                                              .reorder_every = 29,
+                                                              .reorder_after = 8,
+                                                              .delay = std::chrono::milliseconds{1},
+                                                          },
+                                                  });
    proxy->start();
 
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
    auto client_connection = run_with_deadline(
-      runtime,
-      client.async_connect(proxy->local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
-      std::chrono::milliseconds{10'000},
-      "lossy echo connect");
+       runtime, client.async_connect(proxy->local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
+       std::chrono::milliseconds{10'000}, "lossy echo connect");
    auto server_connection = get_with_deadline(accept_future, std::chrono::milliseconds{10'000}, "lossy echo accept");
 
    auto server_echo = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         auto request = co_await framed.async_read_frame();
-         const auto size = request.size();
-         co_await framed.async_write_frame(request);
-         co_return size;
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<std::size_t> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          auto request = co_await framed.async_read_frame();
+          const auto size = request.size();
+          co_await framed.async_write_frame(request);
+          co_return size;
+       },
+       boost::asio::use_future);
 
-   auto client_stream = run_with_deadline(runtime, client_connection.async_open_stream(), std::chrono::milliseconds{5'000}, "lossy echo open stream");
+   auto client_stream = run_with_deadline(runtime, client_connection.async_open_stream(),
+                                          std::chrono::milliseconds{5'000}, "lossy echo open stream");
    auto framed = framed_stream{std::move(client_stream)};
    auto payload = std::vector<std::uint8_t>(64 * 1024);
    for (std::size_t index = 0; index < payload.size(); ++index) {
       payload[index] = static_cast<std::uint8_t>((index * 23U) % 251U);
    }
-   run_with_deadline(runtime, framed.async_write_frame(payload), std::chrono::milliseconds{10'000}, "lossy echo write frame");
-   const auto reply = run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{10'000}, "lossy echo read frame");
+   run_with_deadline(runtime, framed.async_write_frame(payload), std::chrono::milliseconds{10'000},
+                     "lossy echo write frame");
+   const auto reply = run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{10'000},
+                                        "lossy echo read frame");
    const auto server_seen = get_with_deadline(server_echo, std::chrono::milliseconds{10'000}, "lossy echo server task");
    const auto proxy_metrics = proxy->metrics();
 
@@ -935,51 +933,54 @@ BOOST_AUTO_TEST_CASE(quic_fault_proxy_repeated_connect_transfer_close) {
    for (auto iteration = 0U; iteration < iteration_count; ++iteration) {
       const auto label_prefix = std::string{"lossy reconnect iteration "} + std::to_string(iteration) + " ";
       auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
-      auto proxy = std::make_shared<udp_fault_proxy>(
-         runtime.context(),
-         server.local_endpoint(),
-         fault_proxy_rules{
-            .client_to_server = fault_rule{
-               .drop_every = 23,
-               .drop_after = 16,
-               .delay = std::chrono::milliseconds{1},
-            },
-            .server_to_client = fault_rule{
-               .drop_every = 29,
-               .drop_after = 16,
-               .delay = std::chrono::milliseconds{1},
-            },
-         });
+      auto proxy = std::make_shared<udp_fault_proxy>(runtime.context(), server.local_endpoint(),
+                                                     fault_proxy_rules{
+                                                         .client_to_server =
+                                                             fault_rule{
+                                                                 .drop_every = 23,
+                                                                 .drop_after = 16,
+                                                                 .delay = std::chrono::milliseconds{1},
+                                                             },
+                                                         .server_to_client =
+                                                             fault_rule{
+                                                                 .drop_every = 29,
+                                                                 .drop_after = 16,
+                                                                 .delay = std::chrono::milliseconds{1},
+                                                             },
+                                                     });
       proxy->start();
       auto server_task = boost::asio::co_spawn(
-         runtime.context(),
-         [&server]() -> boost::asio::awaitable<std::size_t> {
-            auto server_connection = co_await server.async_accept();
-            auto accepted = co_await server_connection.async_accept_stream();
-            auto framed = framed_stream{std::move(accepted)};
-            auto request = co_await framed.async_read_frame();
-            const auto size = request.size();
-            co_await framed.async_write_frame(request);
-            co_return size;
-         },
-         boost::asio::use_future);
+          runtime.context(),
+          [&server]() -> boost::asio::awaitable<std::size_t> {
+             auto server_connection = co_await server.async_accept();
+             auto accepted = co_await server_connection.async_accept_stream();
+             auto framed = framed_stream{std::move(accepted)};
+             auto request = co_await framed.async_read_frame();
+             const auto size = request.size();
+             co_await framed.async_write_frame(request);
+             co_return size;
+          },
+          boost::asio::use_future);
 
-      auto client_connection = run_with_deadline(
-         runtime,
-         client.async_connect(proxy->local_endpoint(), loopback_client_options()),
-         std::chrono::milliseconds{10'000},
-         label_prefix + "connect");
-      auto client_stream = run_with_deadline(runtime, client_connection.async_open_stream(), std::chrono::milliseconds{5'000}, label_prefix + "open stream");
+      auto client_connection =
+          run_with_deadline(runtime, client.async_connect(proxy->local_endpoint(), loopback_client_options()),
+                            std::chrono::milliseconds{10'000}, label_prefix + "connect");
+      auto client_stream = run_with_deadline(runtime, client_connection.async_open_stream(),
+                                             std::chrono::milliseconds{5'000}, label_prefix + "open stream");
       auto framed = framed_stream{std::move(client_stream)};
       auto payload = std::vector<std::uint8_t>(64 * 1024);
       for (std::size_t index = 0; index < payload.size(); ++index) {
          payload[index] = static_cast<std::uint8_t>((index + iteration * 11U) % 251U);
       }
-      run_with_deadline(runtime, framed.async_write_frame(payload), std::chrono::milliseconds{10'000}, label_prefix + "write frame");
-      const auto reply = run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{10'000}, label_prefix + "read frame");
+      run_with_deadline(runtime, framed.async_write_frame(payload), std::chrono::milliseconds{10'000},
+                        label_prefix + "write frame");
+      const auto reply = run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{10'000},
+                                           label_prefix + "read frame");
       BOOST_TEST(reply == payload, boost::test_tools::per_element());
-      run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000}, label_prefix + "close");
-      BOOST_TEST(get_with_deadline(server_task, std::chrono::milliseconds{10'000}, label_prefix + "server task") == payload.size());
+      run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000},
+                        label_prefix + "close");
+      BOOST_TEST(get_with_deadline(server_task, std::chrono::milliseconds{10'000}, label_prefix + "server task") ==
+                 payload.size());
       const auto proxy_metrics = proxy->metrics();
       BOOST_TEST(proxy_metrics.client_to_server.dropped + proxy_metrics.server_to_client.dropped > 0U);
       proxy->stop();
@@ -994,20 +995,16 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_alpn_mismatch) {
 
    try {
       (void)fcl::asio::blocking::run(
-         runtime,
-         client.async_connect(
-            server.local_endpoint(),
-            client_options{
-               .alpn = "wrong-alpn",
-               .handshake_timeout = std::chrono::milliseconds{500},
-               .security = security_options{.verify_peer = false},
-            }));
+          runtime,
+          client.async_connect(server.local_endpoint(), client_options{
+                                                            .alpn = "wrong-alpn",
+                                                            .handshake_timeout = std::chrono::milliseconds{500},
+                                                            .security = security_options{.verify_peer = false},
+                                                        }));
       BOOST_FAIL("expected QUIC handshake/alpn failure");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::handshake_timeout ||
-         error.kind() == error_kind::alpn_mismatch ||
-         error.kind() == error_kind::internal_error;
+      const auto acceptable = error.kind() == error_kind::handshake_timeout ||
+                              error.kind() == error_kind::alpn_mismatch || error.kind() == error_kind::internal_error;
       BOOST_TEST(acceptable);
    }
    server.stop();
@@ -1026,61 +1023,55 @@ BOOST_AUTO_TEST_CASE(quic_connect_timeout_limits_stalled_handshake_budget) {
    const auto started = std::chrono::steady_clock::now();
 
    try {
-      (void)run_with_deadline(
-         runtime,
-         client.async_connect(to_quic_endpoint(blackhole.local_endpoint()), std::move(options)),
-         std::chrono::milliseconds{2'000},
-         "blackhole connect timeout");
+      (void)run_with_deadline(runtime,
+                              client.async_connect(to_quic_endpoint(blackhole.local_endpoint()), std::move(options)),
+                              std::chrono::milliseconds{2'000}, "blackhole connect timeout");
       BOOST_FAIL("expected QUIC connect timeout");
    } catch (const quic_error& error) {
       BOOST_TEST(static_cast<int>(error.kind()) == static_cast<int>(error_kind::connect_timeout));
    }
-   const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - started);
+   const auto elapsed =
+       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
    BOOST_TEST(elapsed.count() < 2'000);
    blackhole.close();
 }
 
 BOOST_AUTO_TEST_CASE(quic_failed_handshake_releases_listener_connection_slot) {
-   auto limits = transport_limits{.max_connections = 1, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 1, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto client = connector{runtime};
 
    try {
-      (void)run_with_deadline(
-         runtime,
-         client.async_connect(
-            server.local_endpoint(),
-            client_options{
-               .alpn = "wrong-alpn",
-               .handshake_timeout = std::chrono::milliseconds{500},
-               .limits = limits,
-               .security = security_options{.verify_peer = false},
-            }),
-         std::chrono::milliseconds{2'000},
-         "failed alpn connect");
+      (void)run_with_deadline(runtime,
+                              client.async_connect(server.local_endpoint(),
+                                                   client_options{
+                                                       .alpn = "wrong-alpn",
+                                                       .handshake_timeout = std::chrono::milliseconds{500},
+                                                       .limits = limits,
+                                                       .security = security_options{.verify_peer = false},
+                                                   }),
+                              std::chrono::milliseconds{2'000}, "failed alpn connect");
       BOOST_FAIL("expected QUIC ALPN failure");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::handshake_timeout ||
-         error.kind() == error_kind::alpn_mismatch ||
-         error.kind() == error_kind::internal_error;
+      const auto acceptable = error.kind() == error_kind::handshake_timeout ||
+                              error.kind() == error_kind::alpn_mismatch || error.kind() == error_kind::internal_error;
       BOOST_TEST(acceptable);
    }
 
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto valid = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
-      std::chrono::milliseconds{5'000},
-      "valid connect after failed alpn");
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
+       std::chrono::milliseconds{5'000}, "valid connect after failed alpn");
    auto accepted = get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "accept after failed alpn");
    BOOST_TEST(valid.valid());
    BOOST_TEST(accepted.valid());
 
    run_with_deadline(runtime, valid.async_close(), std::chrono::milliseconds{5'000}, "close valid after failed alpn");
-   run_with_deadline(runtime, accepted.async_close(), std::chrono::milliseconds{5'000}, "close accepted after failed alpn");
+   run_with_deadline(runtime, accepted.async_close(), std::chrono::milliseconds{5'000},
+                     "close accepted after failed alpn");
    server.stop();
 }
 
@@ -1089,18 +1080,19 @@ BOOST_AUTO_TEST_CASE(quic_remote_close_during_active_read_is_reported) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
 
    auto server_close = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         (void)co_await framed.async_read_frame();
-         co_await framed.async_close();
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          (void)co_await framed.async_read_frame();
+          co_await framed.async_close();
+       },
+       boost::asio::use_future);
 
    auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
    auto framed = framed_stream{std::move(client_stream)};
@@ -1109,10 +1101,8 @@ BOOST_AUTO_TEST_CASE(quic_remote_close_during_active_read_is_reported) {
       (void)fcl::asio::blocking::run(runtime, framed.async_read_frame());
       BOOST_FAIL("expected remote stream close to unblock read with typed error");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::stream_closed ||
-         error.kind() == error_kind::connection_closed ||
-         error.kind() == error_kind::stream_reset;
+      const auto acceptable = error.kind() == error_kind::stream_closed ||
+                              error.kind() == error_kind::connection_closed || error.kind() == error_kind::stream_reset;
       BOOST_TEST(acceptable);
    }
    server_close.get();
@@ -1121,28 +1111,28 @@ BOOST_AUTO_TEST_CASE(quic_remote_close_during_active_read_is_reported) {
 }
 
 BOOST_AUTO_TEST_CASE(quic_listener_reuses_connection_slot_after_close) {
-   auto limits = transport_limits{.max_connections = 1, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 1, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto client = connector{runtime};
 
    auto accept_first = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto first = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
-      std::chrono::milliseconds{5'000},
-      "first connect with max one connection");
-   auto first_server = get_with_deadline(accept_first, std::chrono::milliseconds{5'000}, "first accept with max one connection");
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
+       std::chrono::milliseconds{5'000}, "first connect with max one connection");
+   auto first_server =
+       get_with_deadline(accept_first, std::chrono::milliseconds{5'000}, "first accept with max one connection");
    run_with_deadline(runtime, first.async_close(), std::chrono::milliseconds{5'000}, "first client close");
    run_with_deadline(runtime, first_server.async_close(), std::chrono::milliseconds{5'000}, "first server close");
 
    auto accept_second = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto second = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
-      std::chrono::milliseconds{5'000},
-      "second connect after cleanup");
-   auto second_server = get_with_deadline(accept_second, std::chrono::milliseconds{5'000}, "second accept after cleanup");
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)),
+       std::chrono::milliseconds{5'000}, "second connect after cleanup");
+   auto second_server =
+       get_with_deadline(accept_second, std::chrono::milliseconds{5'000}, "second accept after cleanup");
    BOOST_TEST(second.valid());
    BOOST_TEST(second_server.valid());
 
@@ -1156,7 +1146,8 @@ BOOST_AUTO_TEST_CASE(quic_connection_cancel_rejects_new_streams) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    (void)accept_future.get();
    client_connection.cancel();
 
@@ -1164,9 +1155,7 @@ BOOST_AUTO_TEST_CASE(quic_connection_cancel_rejects_new_streams) {
       (void)fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
       BOOST_FAIL("expected canceled connection to reject new streams");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::connection_closed ||
-         error.kind() == error_kind::canceled;
+      const auto acceptable = error.kind() == error_kind::connection_closed || error.kind() == error_kind::canceled;
       BOOST_TEST(acceptable);
    }
    server.stop();
@@ -1179,13 +1168,12 @@ BOOST_AUTO_TEST_CASE(quic_loopback_verifies_pinned_peer_fingerprint) {
    auto client = connector{runtime};
 
    auto connection = fcl::asio::blocking::run(
-      runtime,
-      client.async_connect(
-         server.local_endpoint(),
-         client_options{
-            .handshake_timeout = std::chrono::milliseconds{5'000},
-            .security = security_options{.verify_peer = true, .expected_sha256_fingerprint = expected},
-         }));
+       runtime, client.async_connect(
+                    server.local_endpoint(),
+                    client_options{
+                        .handshake_timeout = std::chrono::milliseconds{5'000},
+                        .security = security_options{.verify_peer = true, .expected_sha256_fingerprint = expected},
+                    }));
 
    BOOST_TEST(connection.valid());
    fcl::asio::blocking::run(runtime, connection.async_close());
@@ -1203,14 +1191,12 @@ BOOST_AUTO_TEST_CASE(quic_loopback_verifies_ca_certificate_hostname) {
 
    auto client_options_value = loopback_client_options();
    client_options_value.security = security_options{
-      .verify_peer = true,
-      .trusted_ca_pem = identity.certificate_pem,
+       .verify_peer = true,
+       .trusted_ca_pem = identity.certificate_pem,
    };
-   auto connection = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), std::move(client_options_value)),
-      std::chrono::milliseconds{5'000},
-      "CA verified hostname connect");
+   auto connection =
+       run_with_deadline(runtime, client.async_connect(server.local_endpoint(), std::move(client_options_value)),
+                         std::chrono::milliseconds{5'000}, "CA verified hostname connect");
 
    BOOST_TEST(connection.valid());
    run_with_deadline(runtime, connection.async_close(), std::chrono::milliseconds{5'000}, "CA verified hostname close");
@@ -1229,22 +1215,17 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_ca_certificate_hostname_mismatch) {
 
    auto client_options_value = loopback_client_options();
    client_options_value.security = security_options{
-      .verify_peer = true,
-      .trusted_ca_pem = identity.certificate_pem,
+       .verify_peer = true,
+       .trusted_ca_pem = identity.certificate_pem,
    };
    try {
-      (void)run_with_deadline(
-         runtime,
-         client.async_connect(server.local_endpoint(), std::move(client_options_value)),
-         std::chrono::milliseconds{5'000},
-         "CA hostname mismatch connect");
+      (void)run_with_deadline(runtime, client.async_connect(server.local_endpoint(), std::move(client_options_value)),
+                              std::chrono::milliseconds{5'000}, "CA hostname mismatch connect");
       BOOST_FAIL("expected QUIC hostname verification failure");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::tls_failed ||
-         error.kind() == error_kind::peer_verification_failed ||
-         error.kind() == error_kind::handshake_timeout ||
-         error.kind() == error_kind::canceled;
+      const auto acceptable = error.kind() == error_kind::tls_failed ||
+                              error.kind() == error_kind::peer_verification_failed ||
+                              error.kind() == error_kind::handshake_timeout || error.kind() == error_kind::canceled;
       BOOST_TEST_CONTEXT("error kind=" << static_cast<int>(error.kind()) << " message=" << error.what()) {
          BOOST_TEST(acceptable);
       }
@@ -1256,8 +1237,8 @@ BOOST_AUTO_TEST_CASE(quic_loopback_accepts_mtls_client_certificate) {
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
    auto server_options_value = loopback_server_options();
    server_options_value.security = security_options{
-      .verify_peer = true,
-      .expected_sha256_fingerprint = sha256_fingerprint(test_certificate_der()),
+       .verify_peer = true,
+       .expected_sha256_fingerprint = sha256_fingerprint(test_certificate_der()),
    };
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, std::move(server_options_value)};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
@@ -1266,11 +1247,9 @@ BOOST_AUTO_TEST_CASE(quic_loopback_accepts_mtls_client_certificate) {
    client_options_value.certificate_pem = std::string{test_certificate()};
    client_options_value.private_key_pem = std::string{test_private_key()};
    auto client = connector{runtime};
-   auto connection = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), std::move(client_options_value)),
-      std::chrono::milliseconds{5'000},
-      "mTLS client connect");
+   auto connection =
+       run_with_deadline(runtime, client.async_connect(server.local_endpoint(), std::move(client_options_value)),
+                         std::chrono::milliseconds{5'000}, "mTLS client connect");
    auto accepted = get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "mTLS server accept");
 
    BOOST_TEST(connection.valid());
@@ -1291,29 +1270,24 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_missing_mtls_client_certificate) {
 
    auto client_connected = false;
    try {
-      auto connection = run_with_deadline(
-         runtime,
-         client.async_connect(server.local_endpoint(), loopback_client_options()),
-         std::chrono::milliseconds{5'000},
-         "missing mTLS client cert connect");
+      auto connection =
+          run_with_deadline(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()),
+                            std::chrono::milliseconds{5'000}, "missing mTLS client cert connect");
       client_connected = connection.valid();
-      run_with_deadline(runtime, connection.async_close(), std::chrono::milliseconds{5'000}, "close missing-cert client");
+      run_with_deadline(runtime, connection.async_close(), std::chrono::milliseconds{5'000},
+                        "close missing-cert client");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::peer_verification_failed ||
-         error.kind() == error_kind::tls_failed ||
-         error.kind() == error_kind::handshake_timeout;
+      const auto acceptable = error.kind() == error_kind::peer_verification_failed ||
+                              error.kind() == error_kind::tls_failed || error.kind() == error_kind::handshake_timeout;
       BOOST_TEST(acceptable);
    }
    try {
       (void)get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "missing-cert server accept");
       BOOST_FAIL("expected missing client certificate to reject server accept");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::peer_verification_failed ||
-         error.kind() == error_kind::tls_failed ||
-         error.kind() == error_kind::handshake_timeout ||
-         error.kind() == error_kind::connection_closed;
+      const auto acceptable = error.kind() == error_kind::peer_verification_failed ||
+                              error.kind() == error_kind::tls_failed || error.kind() == error_kind::handshake_timeout ||
+                              error.kind() == error_kind::connection_closed;
       BOOST_TEST(acceptable);
    }
    (void)client_connected;
@@ -1327,16 +1301,17 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_wrong_peer_fingerprint) {
 
    try {
       (void)fcl::asio::blocking::run(
-         runtime,
-         client.async_connect(
-            server.local_endpoint(),
-            client_options{
-               .handshake_timeout = std::chrono::milliseconds{5'000},
-               .security = security_options{
-                  .verify_peer = true,
-                  .expected_sha256_fingerprint = "0000000000000000000000000000000000000000000000000000000000000000",
-               },
-            }));
+          runtime,
+          client.async_connect(server.local_endpoint(),
+                               client_options{
+                                   .handshake_timeout = std::chrono::milliseconds{5'000},
+                                   .security =
+                                       security_options{
+                                           .verify_peer = true,
+                                           .expected_sha256_fingerprint =
+                                               "0000000000000000000000000000000000000000000000000000000000000000",
+                                       },
+                               }));
       BOOST_FAIL("expected peer fingerprint rejection");
    } catch (const quic_error& error) {
       BOOST_TEST(static_cast<int>(error.kind()) == static_cast<int>(error_kind::peer_verification_failed));
@@ -1349,33 +1324,37 @@ BOOST_AUTO_TEST_CASE(quic_connection_close_unblocks_pending_stream_read) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
    auto stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
 
    auto read_future = boost::asio::co_spawn(runtime.context(), stream.async_read(), boost::asio::use_future);
-   run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000}, "close while stream read is pending");
+   run_with_deadline(runtime, client_connection.async_close(), std::chrono::milliseconds{5'000},
+                     "close while stream read is pending");
 
    try {
       (void)get_with_deadline(read_future, std::chrono::milliseconds{5'000}, "pending stream read after close");
       BOOST_FAIL("expected pending stream read to unblock with a close error");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::connection_closed ||
-         error.kind() == error_kind::stream_closed ||
-         error.kind() == error_kind::stream_reset;
+      const auto acceptable = error.kind() == error_kind::connection_closed ||
+                              error.kind() == error_kind::stream_closed || error.kind() == error_kind::stream_reset;
       BOOST_TEST(acceptable);
    }
-   run_with_deadline(runtime, server_connection.async_close(), std::chrono::milliseconds{5'000}, "server close after pending read");
+   run_with_deadline(runtime, server_connection.async_close(), std::chrono::milliseconds{5'000},
+                     "server close after pending read");
    server.stop();
 }
 
 BOOST_AUTO_TEST_CASE(quic_loopback_rejects_max_streams_backpressure) {
-   auto limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 1, .max_queued_bytes = 16 * 1024 * 1024};
+   auto limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 1, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto client = connector{runtime};
-   auto connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
+   auto connection = fcl::asio::blocking::run(
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
 
    auto first = fcl::asio::blocking::run(runtime, connection.async_open_stream());
    BOOST_TEST(first.valid());
@@ -1390,57 +1369,63 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_max_streams_backpressure) {
 }
 
 BOOST_AUTO_TEST_CASE(quic_loopback_allows_new_stream_after_previous_stream_closes) {
-   auto client_limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 1, .max_queued_bytes = 16 * 1024 * 1024};
-   auto server_limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
+   auto client_limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 1, .max_queued_bytes = 16 * 1024 * 1024};
+   auto server_limits =
+       transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 16 * 1024 * 1024};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", server_limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", server_limits)};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
    auto connection = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", client_limits)),
-      std::chrono::milliseconds{5'000},
-      "stream reuse connect");
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", client_limits)),
+       std::chrono::milliseconds{5'000}, "stream reuse connect");
    auto server_connection = std::make_shared<fcl::quic::connection>(
-      get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "stream reuse accept"));
+       get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "stream reuse accept"));
 
    for (auto index = 0U; index < 2U; ++index) {
       auto server_task = boost::asio::co_spawn(
-         runtime.context(),
-         [server_connection]() -> boost::asio::awaitable<void> {
-            auto accepted = co_await server_connection->async_accept_stream();
-            auto framed = framed_stream{std::move(accepted)};
-            (void)co_await framed.async_read_frame();
-            co_await framed.async_close();
-         },
-         boost::asio::use_future);
+          runtime.context(),
+          [server_connection]() -> boost::asio::awaitable<void> {
+             auto accepted = co_await server_connection->async_accept_stream();
+             auto framed = framed_stream{std::move(accepted)};
+             (void)co_await framed.async_read_frame();
+             co_await framed.async_close();
+          },
+          boost::asio::use_future);
 
-      auto stream = run_with_deadline(runtime, connection.async_open_stream(), std::chrono::milliseconds{5'000}, "open active-limited stream");
+      auto stream = run_with_deadline(runtime, connection.async_open_stream(), std::chrono::milliseconds{5'000},
+                                      "open active-limited stream");
       auto framed = framed_stream{std::move(stream)};
-      run_with_deadline(runtime, framed.async_write_frame(std::vector<std::uint8_t>{static_cast<std::uint8_t>(index)}), std::chrono::milliseconds{5'000}, "write active-limited stream");
+      run_with_deadline(runtime, framed.async_write_frame(std::vector<std::uint8_t>{static_cast<std::uint8_t>(index)}),
+                        std::chrono::milliseconds{5'000}, "write active-limited stream");
       run_with_deadline(runtime, framed.async_close(), std::chrono::milliseconds{5'000}, "close active-limited stream");
       try {
-         (void)run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{5'000}, "observe active-limited stream close");
+         (void)run_with_deadline(runtime, framed.async_read_frame(), std::chrono::milliseconds{5'000},
+                                 "observe active-limited stream close");
       } catch (const quic_error& error) {
-         const auto acceptable =
-            error.kind() == error_kind::stream_closed ||
-            error.kind() == error_kind::connection_closed ||
-            error.kind() == error_kind::stream_reset;
+         const auto acceptable = error.kind() == error_kind::stream_closed ||
+                                 error.kind() == error_kind::connection_closed ||
+                                 error.kind() == error_kind::stream_reset;
          BOOST_TEST(acceptable);
       }
       get_with_deadline(server_task, std::chrono::milliseconds{5'000}, "stream reuse server task");
    }
 
-   run_with_deadline(runtime, connection.async_close(), std::chrono::milliseconds{5'000}, "stream reuse connection close");
+   run_with_deadline(runtime, connection.async_close(), std::chrono::milliseconds{5'000},
+                     "stream reuse connection close");
    server.stop();
 }
 
 BOOST_AUTO_TEST_CASE(quic_loopback_rejects_max_queued_bytes_backpressure) {
    auto limits = transport_limits{.max_connections = 16, .max_streams_per_connection = 16, .max_queued_bytes = 3};
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", limits)};
    auto client = connector{runtime};
-   auto connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
+   auto connection = fcl::asio::blocking::run(
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", limits)));
    auto outbound = fcl::asio::blocking::run(runtime, connection.async_open_stream());
 
    try {
@@ -1457,48 +1442,45 @@ BOOST_AUTO_TEST_CASE(quic_loopback_rejects_max_queued_bytes_backpressure) {
 
 BOOST_AUTO_TEST_CASE(quic_loopback_rejects_inbound_packet_queue_overflow) {
    auto server_limits = transport_limits{
-      .max_connections = 16,
-      .max_streams_per_connection = 16,
-      .max_queued_bytes = 16 * 1024 * 1024,
+       .max_connections = 16,
+       .max_streams_per_connection = 16,
+       .max_queued_bytes = 16 * 1024 * 1024,
    };
    auto client_limits = transport_limits{
-      .max_connections = 16,
-      .max_streams_per_connection = 16,
-      .max_queued_bytes = 16 * 1024 * 1024,
-      .max_inbound_queued_bytes = 1,
-      .max_inbound_queued_packets = 16,
+       .max_connections = 16,
+       .max_streams_per_connection = 16,
+       .max_queued_bytes = 16 * 1024 * 1024,
+       .max_inbound_queued_bytes = 1,
+       .max_inbound_queued_packets = 16,
    };
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 2}};
-   auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", server_limits)};
+   auto server =
+       listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options("fcl-p2p/1", server_limits)};
    auto client = connector{runtime};
 
    try {
       (void)run_with_deadline(
-         runtime,
-         client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", client_limits)),
-         std::chrono::milliseconds{5'000},
-         "inbound overflow connect");
+          runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", client_limits)),
+          std::chrono::milliseconds{5'000}, "inbound overflow connect");
       BOOST_FAIL("expected inbound packet queue overflow to close the connection");
    } catch (const quic_error& error) {
-      const auto acceptable =
-         error.kind() == error_kind::connection_closed ||
-         error.kind() == error_kind::canceled ||
-         error.kind() == error_kind::backpressure_rejected;
+      const auto acceptable = error.kind() == error_kind::connection_closed || error.kind() == error_kind::canceled ||
+                              error.kind() == error_kind::backpressure_rejected;
       BOOST_TEST(acceptable);
    }
 
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto valid = run_with_deadline(
-      runtime,
-      client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", server_limits)),
-      std::chrono::milliseconds{5'000},
-      "valid connect after inbound overflow");
+       runtime, client.async_connect(server.local_endpoint(), loopback_client_options("fcl-p2p/1", server_limits)),
+       std::chrono::milliseconds{5'000}, "valid connect after inbound overflow");
    auto accepted = get_with_deadline(accept_future, std::chrono::milliseconds{5'000}, "accept after inbound overflow");
    BOOST_TEST(valid.valid());
    BOOST_TEST(accepted.valid());
    BOOST_TEST(!accepted.metrics().closed);
-   run_with_deadline(runtime, valid.async_close(), std::chrono::milliseconds{5'000}, "valid close after inbound overflow");
-   run_with_deadline(runtime, accepted.async_close(), std::chrono::milliseconds{5'000}, "accepted close after inbound overflow");
+   run_with_deadline(runtime, valid.async_close(), std::chrono::milliseconds{5'000},
+                     "valid close after inbound overflow");
+   run_with_deadline(runtime, accepted.async_close(), std::chrono::milliseconds{5'000},
+                     "accepted close after inbound overflow");
    server.stop();
 }
 
@@ -1507,19 +1489,20 @@ BOOST_AUTO_TEST_CASE(quic_framed_stream_rejects_oversized_remote_frame) {
    auto server = listener{runtime, endpoint{.host = "127.0.0.1", .port = 0}, loopback_server_options()};
    auto accept_future = boost::asio::co_spawn(runtime.context(), server.async_accept(), boost::asio::use_future);
    auto client = connector{runtime};
-   auto client_connection = fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
+   auto client_connection =
+       fcl::asio::blocking::run(runtime, client.async_connect(server.local_endpoint(), loopback_client_options()));
    auto server_connection = accept_future.get();
 
    auto server_send = boost::asio::co_spawn(
-      runtime.context(),
-      [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
-         auto accepted = co_await server_connection.async_accept_stream();
-         auto framed = framed_stream{std::move(accepted)};
-         (void)co_await framed.async_read_frame();
-         const auto payload = std::vector<std::uint8_t>{1, 2, 3, 4};
-         co_await framed.async_write_frame(payload);
-      },
-      boost::asio::use_future);
+       runtime.context(),
+       [server_connection = std::move(server_connection)]() mutable -> boost::asio::awaitable<void> {
+          auto accepted = co_await server_connection.async_accept_stream();
+          auto framed = framed_stream{std::move(accepted)};
+          (void)co_await framed.async_read_frame();
+          const auto payload = std::vector<std::uint8_t>{1, 2, 3, 4};
+          co_await framed.async_write_frame(payload);
+       },
+       boost::asio::use_future);
 
    auto client_stream = fcl::asio::blocking::run(runtime, client_connection.async_open_stream());
    auto framed = framed_stream{std::move(client_stream), frame_codec_options{.max_frame_size = 3}};

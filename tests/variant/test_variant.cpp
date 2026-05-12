@@ -15,10 +15,7 @@ using namespace fcl;
 using std::string;
 
 namespace {
-enum class described_access : int64_t {
-   read = 1,
-   write = 2
-};
+enum class described_access : int64_t { read = 1, write = 2 };
 BOOST_DESCRIBE_ENUM(described_access, read, write)
 
 struct described_variant_config {
@@ -32,8 +29,7 @@ BOOST_DESCRIBE_STRUCT(described_variant_config, (), (name, limit, access))
 } // namespace
 
 BOOST_AUTO_TEST_SUITE(variant_test_suite)
-BOOST_AUTO_TEST_CASE(boost_describe_struct_variant_roundtrip)
-{
+BOOST_AUTO_TEST_CASE(boost_describe_struct_variant_roundtrip) {
    const described_variant_config original{"workspace", 42, described_access::write};
 
    fcl::variant as_variant;
@@ -49,11 +45,8 @@ BOOST_AUTO_TEST_CASE(boost_describe_struct_variant_roundtrip)
    BOOST_CHECK(original == roundtrip);
 }
 
-BOOST_AUTO_TEST_CASE(boost_describe_variant_missing_fields_keep_defaults_and_unknown_fields_are_ignored)
-{
-   const fcl::variant input = fcl::mutable_variant_object()
-      ("name", "override")
-      ("unknown", "ignored");
+BOOST_AUTO_TEST_CASE(boost_describe_variant_missing_fields_keep_defaults_and_unknown_fields_are_ignored) {
+   const fcl::variant input = fcl::mutable_variant_object()("name", "override")("unknown", "ignored");
 
    described_variant_config parsed;
    fcl::from_variant(input, parsed);
@@ -63,18 +56,14 @@ BOOST_AUTO_TEST_CASE(boost_describe_variant_missing_fields_keep_defaults_and_unk
    BOOST_CHECK(parsed.access == described_access::read);
 }
 
-BOOST_AUTO_TEST_CASE(boost_describe_variant_bad_enum_value_fails)
-{
-   const fcl::variant input = fcl::mutable_variant_object()
-      ("name", "bad")
-      ("access", "delete");
+BOOST_AUTO_TEST_CASE(boost_describe_variant_bad_enum_value_fails) {
+   const fcl::variant input = fcl::mutable_variant_object()("name", "bad")("access", "delete");
 
    described_variant_config parsed;
    BOOST_CHECK_THROW(fcl::from_variant(input, parsed), std::invalid_argument);
 }
 
-BOOST_AUTO_TEST_CASE(std_chrono_variant_iso_roundtrip)
-{
+BOOST_AUTO_TEST_CASE(std_chrono_variant_iso_roundtrip) {
    const std::chrono::sys_time<std::chrono::microseconds> timestamp{std::chrono::seconds{1}};
    fcl::variant encoded;
    fcl::to_variant(timestamp, encoded);
@@ -93,60 +82,60 @@ BOOST_AUTO_TEST_CASE(std_chrono_variant_iso_roundtrip)
    BOOST_CHECK(micros == std::chrono::microseconds{-1});
 }
 
-BOOST_AUTO_TEST_CASE(mutable_variant_object_test)
-{
-  // no BOOST_CHECK / BOOST_REQUIRE, just see that this compiles on all supported platforms
-  try {
-    variant v(42);
-    variant_object vo;
-    mutable_variant_object mvo;
-    variants vs;
-    vs.push_back(mutable_variant_object("level", "debug")("color", v));
-    vs.push_back(mutable_variant_object()("level", "debug")("color", v));
-    vs.push_back(mutable_variant_object("level", "debug")("color", "green"));
-    vs.push_back(mutable_variant_object()("level", "debug")("color", "green"));
-    vs.push_back(mutable_variant_object("level", "debug")(vo));
-    vs.push_back(mutable_variant_object()("level", "debug")(mvo));
-    vs.push_back(mutable_variant_object("level", "debug").set("color", v));
-    vs.push_back(mutable_variant_object()("level", "debug").set("color", v));
-    vs.push_back(mutable_variant_object("level", "debug").set("color", "green"));
-    vs.push_back(mutable_variant_object()("level", "debug").set("color", "green"));
-  }
-  FCL_LOG_AND_RETHROW();
+BOOST_AUTO_TEST_CASE(mutable_variant_object_test) {
+   // no BOOST_CHECK / BOOST_REQUIRE, just see that this compiles on all supported platforms
+   try {
+      variant v(42);
+      variant_object vo;
+      mutable_variant_object mvo;
+      variants vs;
+      vs.push_back(mutable_variant_object("level", "debug")("color", v));
+      vs.push_back(mutable_variant_object()("level", "debug")("color", v));
+      vs.push_back(mutable_variant_object("level", "debug")("color", "green"));
+      vs.push_back(mutable_variant_object()("level", "debug")("color", "green"));
+      vs.push_back(mutable_variant_object("level", "debug")(vo));
+      vs.push_back(mutable_variant_object()("level", "debug")(mvo));
+      vs.push_back(mutable_variant_object("level", "debug").set("color", v));
+      vs.push_back(mutable_variant_object()("level", "debug").set("color", v));
+      vs.push_back(mutable_variant_object("level", "debug").set("color", "green"));
+      vs.push_back(mutable_variant_object()("level", "debug").set("color", "green"));
+   }
+   FCL_LOG_AND_RETHROW();
 }
 
-BOOST_AUTO_TEST_CASE(variant_format_string_limited)
-{
+BOOST_AUTO_TEST_CASE(variant_format_string_limited) {
    constexpr size_t long_rep_char_num = 1024;
    const std::string a_long_list = std::string(long_rep_char_num, 'a');
    const std::string b_long_list = std::string(long_rep_char_num, 'b');
    {
       const string format = "${a} ${b} ${c}";
       fcl::mutable_variant_object mu;
-      mu( "a", string( long_rep_char_num, 'a' ) );
-      mu( "b", string( long_rep_char_num, 'b' ) );
-      mu( "c", string( long_rep_char_num, 'c' ) );
-      const string result = fcl::format_string( format, mu, true );
+      mu("a", string(long_rep_char_num, 'a'));
+      mu("b", string(long_rep_char_num, 'b'));
+      mu("c", string(long_rep_char_num, 'c'));
+      const string result = fcl::format_string(format, mu, true);
       BOOST_CHECK_LT(0u, mu.size());
       const auto arg_limit_size = (1024 - format.size()) / mu.size();
-      BOOST_CHECK_EQUAL( result, string(arg_limit_size, 'a' ) + "... " + string(arg_limit_size, 'b' ) + "... " + string(arg_limit_size, 'c' ) + "..." );
+      BOOST_CHECK_EQUAL(result, string(arg_limit_size, 'a') + "... " + string(arg_limit_size, 'b') + "... " +
+                                    string(arg_limit_size, 'c') + "...");
       BOOST_CHECK_LT(result.size(), 1024 + 3 * mu.size());
    }
-   {  // verify object, array, blob, and string, all exceeds limits, fold display for each
+   { // verify object, array, blob, and string, all exceeds limits, fold display for each
       fcl::mutable_variant_object mu;
-      mu( "str", a_long_list );
-      mu( "obj", variant_object(mutable_variant_object()("a", a_long_list)("b", b_long_list)) );
-      mu( "arr", variants{variant(a_long_list), variant(b_long_list)} );
-      mu( "blob", blob({std::vector<char>(a_long_list.begin(), a_long_list.end())}) );
+      mu("str", a_long_list);
+      mu("obj", variant_object(mutable_variant_object()("a", a_long_list)("b", b_long_list)));
+      mu("arr", variants{variant(a_long_list), variant(b_long_list)});
+      mu("blob", blob({std::vector<char>(a_long_list.begin(), a_long_list.end())}));
       const string format_prefix = "Format string test: ";
       const string format_str = format_prefix + "${str} ${obj} ${arr} {blob}";
-      const string result = fcl::format_string( format_str, mu, true );
+      const string result = fcl::format_string(format_str, mu, true);
       BOOST_CHECK_LT(0u, mu.size());
       const auto arg_limit_size = (1024 - format_str.size()) / mu.size();
-      BOOST_CHECK_EQUAL( result, format_prefix + a_long_list.substr(0, arg_limit_size) + "..." + " ${obj} ${arr} {blob}");
+      BOOST_CHECK_EQUAL(result,
+                        format_prefix + a_long_list.substr(0, arg_limit_size) + "..." + " ${obj} ${arr} {blob}");
       BOOST_CHECK_LT(result.size(), 1024 + 3 * mu.size());
    }
-   {  // verify object, array can be displayed properly
+   { // verify object, array can be displayed properly
       const string format_prefix = "Format string test: ";
       const string format_str = format_prefix + "${str} ${obj} ${arr} ${blob} ${var}";
       BOOST_CHECK_LT(format_str.size(), 1024u);
@@ -163,25 +152,23 @@ BOOST_AUTO_TEST_CASE(variant_format_string_limited)
       const variants variant_list{variant(d_short_list), variant(e_short_list)};
       const blob a_blob({std::vector<char>(f_short_list.begin(), f_short_list.end())});
       const variant a_variant(g_short_list);
-      mu( "str",  a_short_list );
-      mu( "obj",  vo);
-      mu( "arr",  variant_list);
-      mu( "blob", a_blob);
-      mu( "var",  a_variant);
-      const string result = fcl::format_string( format_str, mu, true );
-      const string target_result = format_prefix + a_short_list + " " +
-                                   "{" + "\"b\":\"" + b_short_list + "\",\"c\":\"" + c_short_list + "\"}" + " " +
-                                   "[\"" + d_short_list + "\",\"" + e_short_list + "\"]" + " " +
-                                   base64_encode( a_blob.data.data(), a_blob.data.size() ) + " " +
-                                   g_short_list;
+      mu("str", a_short_list);
+      mu("obj", vo);
+      mu("arr", variant_list);
+      mu("blob", a_blob);
+      mu("var", a_variant);
+      const string result = fcl::format_string(format_str, mu, true);
+      const string target_result = format_prefix + a_short_list + " " + "{" + "\"b\":\"" + b_short_list +
+                                   "\",\"c\":\"" + c_short_list + "\"}" + " " + "[\"" + d_short_list + "\",\"" +
+                                   e_short_list + "\"]" + " " + base64_encode(a_blob.data.data(), a_blob.data.size()) +
+                                   " " + g_short_list;
 
-      BOOST_CHECK_EQUAL( result, target_result);
+      BOOST_CHECK_EQUAL(result, target_result);
       BOOST_CHECK_LT(result.size(), 1024 + 3 * mu.size());
    }
 }
 
-BOOST_AUTO_TEST_CASE(variant_blob)
-{
+BOOST_AUTO_TEST_CASE(variant_blob) {
    // Some test cases from https://github.com/ReneNyffenegger/cpp-base64
    {
       std::string a17_orig = "aaaaaaaaaaaaaaaaa";
@@ -196,7 +183,10 @@ BOOST_AUTO_TEST_CASE(variant_blob)
       BOOST_CHECK_EQUAL(b64_str, a17_orig);
    }
    {
-      std::string s_6364 = "\x03" "\xef" "\xff" "\xf9";
+      std::string s_6364 = "\x03"
+                           "\xef"
+                           "\xff"
+                           "\xf9";
       std::string s_6364_encoded = "A+//+Q==";
       fcl::mutable_variant_object mu;
       mu("blob", blob{{s_6364.begin(), s_6364.end()}});
@@ -222,8 +212,7 @@ BOOST_AUTO_TEST_CASE(variant_blob)
    }
 }
 
-BOOST_AUTO_TEST_CASE(variant_blob_backwards_compatibility)
-{
+BOOST_AUTO_TEST_CASE(variant_blob_backwards_compatibility) {
    // pre-5.0 variant would add an additional `=` as a flag that the blob data was base64 encoded
    // verify variant can process encoded data with the extra `=`
    {

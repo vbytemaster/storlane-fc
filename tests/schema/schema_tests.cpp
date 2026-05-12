@@ -21,11 +21,14 @@ BOOST_DESCRIBE_STRUCT(fcl_schema_tests::http_config, (), (bind_port, bind_host, 
 
 import fcl.schema;
 
-template <>
-struct fcl::schema::rules<fcl_schema_tests::http_config> {
+template <> struct fcl::schema::rules<fcl_schema_tests::http_config> {
    [[nodiscard]] static fcl::schema::object_schema<fcl_schema_tests::http_config> define() {
       auto schema = fcl::schema::object<fcl_schema_tests::http_config>();
-      schema.field<&fcl_schema_tests::http_config::bind_port>("bind-port").required().default_value(8080).range(1, 65535).description("HTTP bind port");
+      schema.field<&fcl_schema_tests::http_config::bind_port>("bind-port")
+          .required()
+          .default_value(8080)
+          .range(1, 65535)
+          .description("HTTP bind port");
       schema.field<&fcl_schema_tests::http_config::bind_host>("bind-host").default_value("127.0.0.1");
       schema.field<&fcl_schema_tests::http_config::tls_enabled>("tls-enabled").default_value(false);
       static_cast<void>(schema.field<&fcl_schema_tests::http_config::tags>("tags"));

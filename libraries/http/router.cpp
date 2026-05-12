@@ -72,8 +72,7 @@ bool match_path(const Entry& entry, const target& parsed_target, std::unordered_
    return true;
 }
 
-template <typename Entry>
-bool path_exists(const std::vector<Entry>& entries, const target& parsed_target) {
+template <typename Entry> bool path_exists(const std::vector<Entry>& entries, const target& parsed_target) {
    for (const auto& entry : entries) {
       if (match_path(entry, parsed_target, nullptr)) {
          return true;
@@ -83,10 +82,8 @@ bool path_exists(const std::vector<Entry>& entries, const target& parsed_target)
 }
 
 template <typename Entry>
-const Entry* find_path_match(
-   const std::vector<Entry>& entries,
-   const target& parsed_target,
-   std::unordered_map<std::string, std::string>& params) {
+const Entry* find_path_match(const std::vector<Entry>& entries, const target& parsed_target,
+                             std::unordered_map<std::string, std::string>& params) {
    for (const auto prefer_parameterized : {false, true}) {
       for (const auto& entry : entries) {
          if (entry.parameterized != prefer_parameterized) {
@@ -125,10 +122,10 @@ void router::del(std::string path, route_handler handler) {
 void router::websocket(std::string path, websocket_route_handler handler) {
    auto segments = split_route_path(path);
    websocket_routes_.push_back(websocket_route_entry{
-      .path = std::move(path),
-      .segments = segments,
-      .parameterized = parameterized(segments),
-      .handler = std::move(handler),
+       .path = std::move(path),
+       .segments = segments,
+       .parameterized = parameterized(segments),
+       .handler = std::move(handler),
    });
 }
 
@@ -177,11 +174,11 @@ std::optional<websocket_route_handler> router::match_websocket(route_context& co
 void router::add_route(method verb, std::string path, route_handler handler) {
    auto segments = split_route_path(path);
    routes_.push_back(route_entry{
-      .verb = verb,
-      .path = std::move(path),
-      .segments = segments,
-      .parameterized = parameterized(segments),
-      .handler = std::move(handler),
+       .verb = verb,
+       .path = std::move(path),
+       .segments = segments,
+       .parameterized = parameterized(segments),
+       .handler = std::move(handler),
    });
 }
 

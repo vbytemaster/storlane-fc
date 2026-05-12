@@ -1,2 +1,1 @@
-namespace fcl::reflect {
-}
+namespace fcl::reflect {}

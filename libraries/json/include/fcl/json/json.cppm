@@ -38,15 +38,13 @@ struct write_options {
    std::chrono::system_clock::time_point deadline = std::chrono::system_clock::time_point::max();
 };
 
-template <typename T>
-struct read_result {
+template <typename T> struct read_result {
    T value{};
    std::vector<schema::diagnostic> diagnostics;
 
    [[nodiscard]] bool ok() const {
-      return std::ranges::none_of(diagnostics, [](const schema::diagnostic& entry) {
-         return entry.level == schema::severity::error;
-      });
+      return std::ranges::none_of(
+          diagnostics, [](const schema::diagnostic& entry) { return entry.level == schema::severity::error; });
    }
 };
 
@@ -55,9 +53,8 @@ struct write_result {
    std::vector<schema::diagnostic> diagnostics;
 
    [[nodiscard]] bool ok() const {
-      return std::ranges::none_of(diagnostics, [](const schema::diagnostic& entry) {
-         return entry.level == schema::severity::error;
-      });
+      return std::ranges::none_of(
+          diagnostics, [](const schema::diagnostic& entry) { return entry.level == schema::severity::error; });
    }
 };
 
@@ -67,12 +64,13 @@ struct write_result {
 [[nodiscard]] write_result write_document(const config::document& input, write_options options = {});
 
 [[nodiscard]] read_result<variant> load_value(const std::filesystem::path& path, read_options options = {});
-[[nodiscard]] write_result save_value(const std::filesystem::path& path, const variant& input, write_options options = {});
+[[nodiscard]] write_result save_value(const std::filesystem::path& path, const variant& input,
+                                      write_options options = {});
 [[nodiscard]] read_result<config::document> load_document(const std::filesystem::path& path, read_options options = {});
-[[nodiscard]] write_result save_document(const std::filesystem::path& path, const config::document& input, write_options options = {});
+[[nodiscard]] write_result save_document(const std::filesystem::path& path, const config::document& input,
+                                         write_options options = {});
 
-template <typename T>
-[[nodiscard]] read_result<T> read(std::string_view input, read_options options = {}) {
+template <typename T> [[nodiscard]] read_result<T> read(std::string_view input, read_options options = {}) {
    auto output = read_result<T>{};
    const auto rules = schema::rules<T>::define();
    if (!rules.fields().empty()) {
@@ -111,19 +109,19 @@ template <typename T>
          from_variant(parsed.value, output.value);
       } catch (const std::exception& error) {
          output.diagnostics.push_back(schema::diagnostic{
-            .path = {},
-            .code = "json.type",
-            .level = schema::severity::error,
-            .message = error.what(),
+             .path = {},
+             .code = "json.type",
+             .level = schema::severity::error,
+             .message = error.what(),
          });
          return output;
       }
    } else {
       output.diagnostics.push_back(schema::diagnostic{
-         .path = {},
-         .code = "json.type",
-         .level = schema::severity::error,
-         .message = "type is not readable from JSON without schema rules or fcl::from_variant",
+          .path = {},
+          .code = "json.type",
+          .level = schema::severity::error,
+          .message = "type is not readable from JSON without schema rules or fcl::from_variant",
       });
       return output;
    }
@@ -138,10 +136,11 @@ template <typename T>
          for (const auto& entry : parsed.value.get_object()) {
             if (!known.contains(entry.key())) {
                output.diagnostics.push_back(schema::diagnostic{
-                  .path = entry.key(),
-                  .code = "json.unknown",
-                  .level = options.unknown_fields == unknown_field_policy::error ? schema::severity::error : schema::severity::warning,
-                  .message = "unknown JSON field",
+                   .path = entry.key(),
+                   .code = "json.unknown",
+                   .level = options.unknown_fields == unknown_field_policy::error ? schema::severity::error
+                                                                                  : schema::severity::warning,
+                   .message = "unknown JSON field",
                });
             }
          }
@@ -153,8 +152,7 @@ template <typename T>
    return output;
 }
 
-template <typename T>
-[[nodiscard]] read_result<T> load(const std::filesystem::path& path, read_options options = {}) {
+template <typename T> [[nodiscard]] read_result<T> load(const std::filesystem::path& path, read_options options = {}) {
    auto parsed = load_value(path, options);
    auto output = read_result<T>{};
    output.diagnostics = std::move(parsed.diagnostics);
@@ -192,19 +190,19 @@ template <typename T>
          from_variant(parsed.value, output.value);
       } catch (const std::exception& error) {
          output.diagnostics.push_back(schema::diagnostic{
-            .path = {},
-            .code = "json.type",
-            .level = schema::severity::error,
-            .message = error.what(),
+             .path = {},
+             .code = "json.type",
+             .level = schema::severity::error,
+             .message = error.what(),
          });
          return output;
       }
    } else {
       output.diagnostics.push_back(schema::diagnostic{
-         .path = {},
-         .code = "json.type",
-         .level = schema::severity::error,
-         .message = "type is not readable from JSON without schema rules or fcl::from_variant",
+          .path = {},
+          .code = "json.type",
+          .level = schema::severity::error,
+          .message = "type is not readable from JSON without schema rules or fcl::from_variant",
       });
       return output;
    }
@@ -214,8 +212,7 @@ template <typename T>
    return output;
 }
 
-template <typename T>
-[[nodiscard]] write_result write(const T& input, write_options options = {}) {
+template <typename T> [[nodiscard]] write_result write(const T& input, write_options options = {}) {
    return write_value(variant{input}, std::move(options));
 }
 

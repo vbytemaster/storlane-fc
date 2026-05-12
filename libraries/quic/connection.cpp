@@ -63,26 +63,26 @@ namespace {
 
 [[nodiscard]] connection_metrics map_metrics(const detail::engine_connection_metrics& metrics) noexcept {
    return connection_metrics{
-      .connections_opened = metrics.connections_opened,
-      .connections_closed = metrics.connections_closed,
-      .handshakes_started = metrics.handshakes_started,
-      .handshakes_completed = metrics.handshakes_completed,
-      .handshakes_failed = metrics.handshakes_failed,
-      .streams_opened = metrics.streams_opened,
-      .streams_accepted = metrics.streams_accepted,
-      .streams_reset = metrics.streams_reset,
-      .frames_sent = metrics.frames_sent,
-      .frames_received = metrics.frames_received,
-      .bytes_sent = metrics.bytes_sent,
-      .bytes_received = metrics.bytes_received,
-      .packets_sent = metrics.packets_sent,
-      .packets_received = metrics.packets_received,
-      .timeouts = metrics.timeouts,
-      .cancellations = metrics.cancellations,
-      .backpressure_rejections = metrics.backpressure_rejections,
-      .queued_bytes = metrics.queued_bytes,
-      .active_streams = metrics.active_streams,
-      .closed = metrics.closed,
+       .connections_opened = metrics.connections_opened,
+       .connections_closed = metrics.connections_closed,
+       .handshakes_started = metrics.handshakes_started,
+       .handshakes_completed = metrics.handshakes_completed,
+       .handshakes_failed = metrics.handshakes_failed,
+       .streams_opened = metrics.streams_opened,
+       .streams_accepted = metrics.streams_accepted,
+       .streams_reset = metrics.streams_reset,
+       .frames_sent = metrics.frames_sent,
+       .frames_received = metrics.frames_received,
+       .bytes_sent = metrics.bytes_sent,
+       .bytes_received = metrics.bytes_received,
+       .packets_sent = metrics.packets_sent,
+       .packets_received = metrics.packets_received,
+       .timeouts = metrics.timeouts,
+       .cancellations = metrics.cancellations,
+       .backpressure_rejections = metrics.backpressure_rejections,
+       .queued_bytes = metrics.queued_bytes,
+       .active_streams = metrics.active_streams,
+       .closed = metrics.closed,
    };
 }
 
@@ -95,7 +95,7 @@ struct connection::impl {
 connection::connection() = default;
 
 connection::connection(detail::connection_handle handle)
-   : impl_(std::make_shared<impl>(impl{.engine = std::move(handle.engine)})) {}
+    : impl_(std::make_shared<impl>(impl{.engine = std::move(handle.engine)})) {}
 
 connection::~connection() = default;
 
@@ -119,8 +119,8 @@ std::optional<peer_certificate> connection::peer_certificate() const {
       return std::nullopt;
    }
    return fcl::quic::peer_certificate{
-      .der = std::move(peer->der),
-      .sha256_fingerprint = std::move(peer->sha256_fingerprint),
+       .der = std::move(peer->der),
+       .sha256_fingerprint = std::move(peer->sha256_fingerprint),
    };
 }
 

@@ -25,10 +25,8 @@ namespace {
    if (record.topic == filter.topic) {
       return true;
    }
-   return filter.include_child_topics &&
-          record.topic.size() > filter.topic.size() &&
-          record.topic.starts_with(filter.topic) &&
-          record.topic[filter.topic.size()] == '.';
+   return filter.include_child_topics && record.topic.size() > filter.topic.size() &&
+          record.topic.starts_with(filter.topic) && record.topic[filter.topic.size()] == '.';
 }
 
 } // namespace
@@ -41,8 +39,7 @@ struct event_subscription::state {
 };
 
 struct event_bus::impl {
-   explicit impl(event_bus_options options_value)
-      : options{options_value} {}
+   explicit impl(event_bus_options options_value) : options{options_value} {}
 
    event_bus_options options;
    mutable std::mutex mutex;
@@ -58,8 +55,7 @@ event_subscription::~event_subscription() {
    unsubscribe();
 }
 
-event_subscription::event_subscription(std::shared_ptr<state> state)
-   : state_{std::move(state)} {}
+event_subscription::event_subscription(std::shared_ptr<state> state) : state_{std::move(state)} {}
 
 event_subscription::event_subscription(event_subscription&&) noexcept = default;
 event_subscription& event_subscription::operator=(event_subscription&&) noexcept = default;
@@ -88,8 +84,7 @@ void event_subscription::unsubscribe() {
    }
 }
 
-event_bus::event_bus(event_bus_options options)
-   : impl_{std::make_shared<impl>(options)} {}
+event_bus::event_bus(event_bus_options options) : impl_{std::make_shared<impl>(options)} {}
 
 event_bus::~event_bus() = default;
 
@@ -105,11 +100,11 @@ event_subscription event_bus::subscribe(event_filter filter) {
 
 void event_bus::publish(event_severity severity, std::string topic, std::string message) {
    auto record = event_record{
-      .id = 0,
-      .time = std::chrono::system_clock::now(),
-      .severity = severity,
-      .topic = std::move(topic),
-      .message = std::move(message),
+       .id = 0,
+       .time = std::chrono::system_clock::now(),
+       .severity = severity,
+       .topic = std::move(topic),
+       .message = std::move(message),
    };
 
    auto lock = std::scoped_lock{impl_->mutex};

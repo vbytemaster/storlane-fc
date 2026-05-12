@@ -16,7 +16,7 @@ struct runtime_options {
 };
 
 class runtime {
-public:
+ public:
    explicit runtime(runtime_options options = {});
    ~runtime();
 
@@ -30,7 +30,7 @@ public:
    [[nodiscard]] const boost::asio::io_context& context() const;
    void stop();
 
-private:
+ private:
    struct impl;
    std::unique_ptr<impl> impl_;
 };

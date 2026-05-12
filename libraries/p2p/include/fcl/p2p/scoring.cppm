@@ -7,10 +7,7 @@ export module fcl.p2p.scoring;
 
 export namespace fcl::p2p {
 
-enum class path_kind {
-   direct,
-   relay
-};
+enum class path_kind { direct, relay };
 
 struct path_observation {
    path_kind kind = path_kind::direct;

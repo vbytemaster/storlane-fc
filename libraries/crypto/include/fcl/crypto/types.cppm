@@ -22,12 +22,12 @@ enum class error_kind {
 };
 
 class error final : public std::runtime_error {
-public:
+ public:
    error(error_kind kind, std::string message);
 
    [[nodiscard]] error_kind kind() const noexcept;
 
-private:
+ private:
    error_kind _kind;
 };
 

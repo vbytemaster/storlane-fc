@@ -24,7 +24,7 @@ enum class application_state {
 };
 
 class application_base {
-public:
+ public:
    virtual ~application_base() = default;
 
    application_base(const application_base&) = delete;
@@ -35,13 +35,14 @@ public:
    virtual boost::asio::awaitable<void> shutdown() = 0;
    virtual void request_stop() noexcept = 0;
 
-protected:
+ protected:
    application_base() = default;
 };
 
 class application_runtime {
-public:
-   application_runtime(plugin_context& context, std::vector<std::unique_ptr<plugin>> plugins, diagnostics_store* diagnostics = nullptr);
+ public:
+   application_runtime(plugin_context& context, std::vector<std::unique_ptr<plugin>> plugins,
+                       diagnostics_store* diagnostics = nullptr);
    ~application_runtime();
 
    application_runtime(const application_runtime&) = delete;
@@ -57,7 +58,7 @@ public:
    [[nodiscard]] application_state state() const noexcept;
    [[nodiscard]] std::size_t plugin_count() const noexcept;
 
-private:
+ private:
    plugin_context* context_ = nullptr;
    diagnostics_store* diagnostics_ = nullptr;
    std::vector<std::unique_ptr<plugin>> plugins_;

@@ -17,14 +17,9 @@ export namespace fcl::app {
 using config_view = std::map<std::string, std::string>;
 
 class plugin_context {
-public:
-   plugin_context(
-      fcl::asio::task_scheduler& scheduler,
-      port_registry& ports,
-      signal_bus& signals,
-      event_bus& events,
-      diagnostics_store* diagnostics = nullptr,
-      config_view config = {});
+ public:
+   plugin_context(fcl::asio::task_scheduler& scheduler, port_registry& ports, signal_bus& signals, event_bus& events,
+                  diagnostics_store* diagnostics = nullptr, config_view config = {});
 
    [[nodiscard]] fcl::asio::task_scheduler& scheduler() noexcept;
    [[nodiscard]] port_registry& ports() noexcept;
@@ -34,7 +29,7 @@ public:
    [[nodiscard]] const config_view& config() const noexcept;
    [[nodiscard]] std::optional<std::string> config_value(const std::string& key) const;
 
-private:
+ private:
    fcl::asio::task_scheduler* scheduler_ = nullptr;
    port_registry* ports_ = nullptr;
    signal_bus* signals_ = nullptr;

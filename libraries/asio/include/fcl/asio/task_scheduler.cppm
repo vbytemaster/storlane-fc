@@ -17,9 +17,8 @@ import fcl.asio.runtime;
 export namespace fcl::asio {
 
 class priority {
-public:
-   explicit constexpr priority(int value = 0) noexcept
-      : value_(value) {}
+ public:
+   explicit constexpr priority(int value = 0) noexcept : value_(value) {}
 
    [[nodiscard]] constexpr int value() const noexcept {
       return value_;
@@ -38,7 +37,7 @@ public:
       return left.value_ <=> right.value_;
    }
 
-private:
+ private:
    int value_ = 0;
 };
 
@@ -66,7 +65,7 @@ struct scheduled_task {
 };
 
 class task_handle {
-public:
+ public:
    task_handle();
    ~task_handle();
 
@@ -82,7 +81,7 @@ public:
    bool cancel() noexcept;
    boost::asio::awaitable<void> wait() const;
 
-private:
+ private:
    struct state;
    std::shared_ptr<state> state_;
 
@@ -92,7 +91,7 @@ private:
 };
 
 class task_scheduler {
-public:
+ public:
    task_scheduler(runtime& runtime, task_scheduler_options options = {});
    ~task_scheduler();
 
@@ -112,7 +111,7 @@ public:
 
    void stop();
 
-private:
+ private:
    struct impl;
    std::shared_ptr<impl> impl_;
 };

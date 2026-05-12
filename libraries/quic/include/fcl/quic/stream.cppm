@@ -17,7 +17,7 @@ struct stream_access;
 } // namespace detail
 
 class stream {
-public:
+ public:
    stream();
    ~stream();
 
@@ -34,7 +34,7 @@ public:
    boost::asio::awaitable<std::vector<std::uint8_t>> async_read();
    boost::asio::awaitable<void> async_close();
 
-private:
+ private:
    friend struct detail::stream_access;
 
    explicit stream(detail::stream_handle handle);

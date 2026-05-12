@@ -42,7 +42,7 @@ struct application_diagnostics_snapshot {
 };
 
 class diagnostics_store {
-public:
+ public:
    diagnostics_store();
    ~diagnostics_store();
 
@@ -50,10 +50,11 @@ public:
    diagnostics_store& operator=(const diagnostics_store&) = delete;
 
    void set_application_state(lifecycle_state state, std::string transition, std::string error = {});
-   void set_plugin_state(std::string id, std::string version, lifecycle_state state, std::string transition, std::string error = {});
+   void set_plugin_state(std::string id, std::string version, lifecycle_state state, std::string transition,
+                         std::string error = {});
    [[nodiscard]] application_diagnostics_snapshot snapshot(const event_bus& events) const;
 
-private:
+ private:
    struct impl;
    std::shared_ptr<impl> impl_;
 };

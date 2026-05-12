@@ -31,12 +31,12 @@ enum class error_kind {
 [[nodiscard]] const char* to_string(error_kind kind) noexcept;
 
 class quic_error final : public std::runtime_error {
-public:
+ public:
    quic_error(error_kind kind, std::string message);
 
    [[nodiscard]] error_kind kind() const noexcept;
 
-private:
+ private:
    error_kind kind_;
 };
 

@@ -31,7 +31,7 @@ struct incoming_protocol_stream {
 using protocol_handler = std::function<boost::asio::awaitable<void>(incoming_protocol_stream)>;
 
 class node {
-public:
+ public:
    node(fcl::asio::runtime& runtime, node_options options);
    ~node();
 
@@ -52,22 +52,18 @@ public:
    boost::asio::awaitable<session_info> async_connect(fcl::quic::endpoint endpoint, connect_options options = {});
    boost::asio::awaitable<void> async_request_peer_exchange(peer_id peer);
    boost::asio::awaitable<reachability_state> async_probe_reachability(peer_id observer);
-   boost::asio::awaitable<relay_reservation_info> async_reserve_relay(
-      peer_id relay_peer,
-      relay_reservation_options options = {});
+   boost::asio::awaitable<relay_reservation_info> async_reserve_relay(peer_id relay_peer,
+                                                                      relay_reservation_options options = {});
    boost::asio::awaitable<void> async_cancel_relay(peer_id relay_peer);
-   boost::asio::awaitable<hole_punch_status> async_attempt_hole_punch(
-      peer_id peer,
-      std::optional<peer_id> relay_peer = std::nullopt,
-      std::chrono::milliseconds timeout = std::chrono::milliseconds{10'000});
-   boost::asio::awaitable<fcl::quic::framed_stream> async_open_protocol_stream(
-      peer_id peer,
-      protocol_id protocol,
-      open_options options = {});
+   boost::asio::awaitable<hole_punch_status>
+   async_attempt_hole_punch(peer_id peer, std::optional<peer_id> relay_peer = std::nullopt,
+                            std::chrono::milliseconds timeout = std::chrono::milliseconds{10'000});
+   boost::asio::awaitable<fcl::quic::framed_stream> async_open_protocol_stream(peer_id peer, protocol_id protocol,
+                                                                               open_options options = {});
    boost::asio::awaitable<void> async_stop();
    void stop();
 
-private:
+ private:
    struct impl;
    std::shared_ptr<impl> impl_;
 };

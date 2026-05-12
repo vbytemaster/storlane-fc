@@ -17,7 +17,8 @@ export namespace fcl::config {
 struct value {
    using array_type = std::vector<value>;
    using object_type = std::map<std::string, value>;
-   using storage_type = std::variant<std::monostate, bool, std::int64_t, std::uint64_t, double, std::string, array_type, object_type>;
+   using storage_type =
+       std::variant<std::monostate, bool, std::int64_t, std::uint64_t, double, std::string, array_type, object_type>;
 
    storage_type storage;
 
@@ -41,13 +42,25 @@ struct value {
       requires(std::floating_point<T>)
    value(T input) : storage{static_cast<double>(input)} {}
 
-   [[nodiscard]] bool is_null() const noexcept { return std::holds_alternative<std::monostate>(storage); }
-   [[nodiscard]] bool is_object() const noexcept { return std::holds_alternative<object_type>(storage); }
-   [[nodiscard]] bool is_array() const noexcept { return std::holds_alternative<array_type>(storage); }
+   [[nodiscard]] bool is_null() const noexcept {
+      return std::holds_alternative<std::monostate>(storage);
+   }
+   [[nodiscard]] bool is_object() const noexcept {
+      return std::holds_alternative<object_type>(storage);
+   }
+   [[nodiscard]] bool is_array() const noexcept {
+      return std::holds_alternative<array_type>(storage);
+   }
 
-   [[nodiscard]] const object_type* as_object() const noexcept { return std::get_if<object_type>(&storage); }
-   [[nodiscard]] object_type* as_object() noexcept { return std::get_if<object_type>(&storage); }
-   [[nodiscard]] const array_type* as_array() const noexcept { return std::get_if<array_type>(&storage); }
+   [[nodiscard]] const object_type* as_object() const noexcept {
+      return std::get_if<object_type>(&storage);
+   }
+   [[nodiscard]] object_type* as_object() noexcept {
+      return std::get_if<object_type>(&storage);
+   }
+   [[nodiscard]] const array_type* as_array() const noexcept {
+      return std::get_if<array_type>(&storage);
+   }
 };
 
 } // namespace fcl::config

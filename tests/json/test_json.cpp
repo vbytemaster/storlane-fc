@@ -26,8 +26,7 @@ import fcl.json;
 import fcl.schema;
 import fcl.variant;
 
-template <>
-struct fcl::schema::rules<fcl_json_tests::http_config> {
+template <> struct fcl::schema::rules<fcl_json_tests::http_config> {
    [[nodiscard]] static fcl::schema::object_schema<fcl_json_tests::http_config> define() {
       auto schema = fcl::schema::object<fcl_json_tests::http_config>();
       schema.field<&fcl_json_tests::http_config::bind_port>("bind-port").required().default_value(8080).range(1, 65535);
@@ -89,7 +88,7 @@ BOOST_AUTO_TEST_CASE(json_document_roundtrip_uses_config_document) {
 
 BOOST_AUTO_TEST_CASE(json_typed_read_uses_schema_defaults_validation_and_unknown_policy) {
    const auto parsed = fcl::json::read<fcl_json_tests::http_config>(
-      R"({"bind-port":9090,"tls-enabled":false,"tags":["alpha"],"extra":1})");
+       R"({"bind-port":9090,"tls-enabled":false,"tags":["alpha"],"extra":1})");
    BOOST_REQUIRE(parsed.ok());
    BOOST_TEST(parsed.value.bind_port == 9090U);
    BOOST_TEST(parsed.value.bind_host == "127.0.0.1");
@@ -99,9 +98,7 @@ BOOST_AUTO_TEST_CASE(json_typed_read_uses_schema_defaults_validation_and_unknown
 
    auto options = fcl::json::read_options{};
    options.unknown_fields = fcl::json::unknown_field_policy::error;
-   const auto rejected = fcl::json::read<fcl_json_tests::http_config>(
-      R"({"bind-port":9090,"extra":1})",
-      options);
+   const auto rejected = fcl::json::read<fcl_json_tests::http_config>(R"({"bind-port":9090,"extra":1})", options);
    BOOST_TEST(!rejected.ok());
    BOOST_TEST(rejected.diagnostics.front().code == "json.unknown");
 

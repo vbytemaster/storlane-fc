@@ -29,7 +29,9 @@ struct client_endpoint {
    std::string base_path = "/";
    bool tls = false;
 
-   [[nodiscard]] bool secure() const { return tls; }
+   [[nodiscard]] bool secure() const {
+      return tls;
+   }
    [[nodiscard]] std::string make_target(std::string_view path) const {
       auto normalized = std::string{path};
       if (normalized.empty()) {
@@ -50,31 +52,27 @@ struct client_endpoint {
 };
 
 class client {
-public:
+ public:
    client(fcl::asio::runtime& runtime, client_endpoint endpoint);
 
-   template<typename Endpoint>
+   template <typename Endpoint>
    client(fcl::asio::runtime& runtime, const Endpoint& endpoint)
-      : client(
-           runtime,
-           client_endpoint{
-              .host = endpoint.host,
-              .port = endpoint.port,
-              .base_path = endpoint.base_path,
-              .tls = endpoint.secure(),
-           }) {}
+       : client(runtime, client_endpoint{
+                             .host = endpoint.host,
+                             .port = endpoint.port,
+                             .base_path = endpoint.base_path,
+                             .tls = endpoint.secure(),
+                         }) {}
 
    ~client();
 
    client(const client&) = delete;
    client& operator=(const client&) = delete;
 
-   boost::asio::awaitable<connection::ptr> async_connect(
-      std::string_view path,
-      client_options options = {});
+   boost::asio::awaitable<connection::ptr> async_connect(std::string_view path, client_options options = {});
    connection::ptr connect(std::string_view path, client_options options = {});
 
-private:
+ private:
    std::unique_ptr<detail::client_impl> impl_;
 };
 

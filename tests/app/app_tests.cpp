@@ -24,13 +24,14 @@ struct sample_port {
 };
 
 class sample_port_impl final : public sample_port {
-public:
-   explicit sample_port_impl(int value)
-      : value_{value} {}
+ public:
+   explicit sample_port_impl(int value) : value_{value} {}
 
-   int value() const override { return value_; }
+   int value() const override {
+      return value_;
+   }
 
-private:
+ private:
    int value_ = 0;
 };
 
@@ -39,14 +40,16 @@ struct lifecycle_log {
 };
 
 class test_plugin final : public fcl::app::plugin {
-public:
+ public:
    test_plugin(std::string id, lifecycle_log& log, bool fail_startup = false)
-      : id_{std::move(id)}
-      , log_{&log}
-      , fail_startup_{fail_startup} {}
+       : id_{std::move(id)}, log_{&log}, fail_startup_{fail_startup} {}
 
-   fcl::app::plugin_id id() const override { return fcl::app::plugin_id{.value = id_}; }
-   std::string version() const override { return "1"; }
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = id_};
+   }
+   std::string version() const override {
+      return "1";
+   }
 
    boost::asio::awaitable<void> initialize(fcl::app::plugin_context&) override {
       log_->entries.push_back("initialize:" + id_);
@@ -66,28 +69,31 @@ public:
       co_return;
    }
 
-private:
+ private:
    std::string id_;
    lifecycle_log* log_ = nullptr;
    bool fail_startup_ = false;
 };
 
 class configurable_plugin final : public fcl::app::plugin {
-public:
-   configurable_plugin(lifecycle_log& log)
-      : log_{&log} {}
+ public:
+   configurable_plugin(lifecycle_log& log) : log_{&log} {}
 
-   fcl::app::plugin_id id() const override { return fcl::app::plugin_id{.value = "configurable"}; }
-   std::string version() const override { return "1"; }
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "configurable"};
+   }
+   std::string version() const override {
+      return "1";
+   }
 
    std::optional<fcl::config::component_descriptor> describe_config() const override {
       return fcl::config::component_descriptor{
-         .section = "http",
-         .fields = {fcl::config::field_descriptor{
-            .name = "bind-port",
-            .kind = fcl::schema::value_kind::unsigned_integer,
-            .required = true,
-         }},
+          .section = "http",
+          .fields = {fcl::config::field_descriptor{
+              .name = "bind-port",
+              .kind = fcl::schema::value_kind::unsigned_integer,
+              .required = true,
+          }},
       };
    }
 
@@ -115,26 +121,22 @@ public:
       co_return;
    }
 
-private:
+ private:
    lifecycle_log* log_ = nullptr;
    std::uint16_t bind_port_ = 0;
 };
 
-fcl::app::plugin_descriptor descriptor(
-   std::string id,
-   lifecycle_log& log,
-   std::vector<fcl::app::plugin_id> dependencies = {},
-   bool enabled_by_default = true,
-   bool fail_startup = false) {
+fcl::app::plugin_descriptor descriptor(std::string id, lifecycle_log& log,
+                                       std::vector<fcl::app::plugin_id> dependencies = {},
+                                       bool enabled_by_default = true, bool fail_startup = false) {
    auto id_value = fcl::app::plugin_id{.value = std::move(id)};
    auto id_copy = id_value;
    return fcl::app::plugin_descriptor{
-      .id = std::move(id_value),
-      .dependencies = std::move(dependencies),
-      .enabled_by_default = enabled_by_default,
-      .factory = [id_copy, &log, fail_startup] {
-         return std::make_unique<test_plugin>(id_copy.value, log, fail_startup);
-      },
+       .id = std::move(id_value),
+       .dependencies = std::move(dependencies),
+       .enabled_by_default = enabled_by_default,
+       .factory = [id_copy, &log,
+                   fail_startup] { return std::make_unique<test_plugin>(id_copy.value, log, fail_startup); },
    };
 }
 
@@ -156,9 +158,9 @@ BOOST_AUTO_TEST_CASE(port_registry_installs_gets_and_rejects_duplicates) {
 
 BOOST_AUTO_TEST_CASE(event_bus_bounds_queues_and_keeps_critical_ring) {
    auto bus = fcl::app::event_bus{fcl::app::event_bus_options{
-      .max_subscription_events = 1,
-      .max_critical_events = 2,
-      .max_recent_events = 3,
+       .max_subscription_events = 1,
+       .max_critical_events = 2,
+       .max_recent_events = 3,
    }};
    auto subscription = bus.subscribe(fcl::app::event_filter{.topic = "app"});
 
@@ -202,12 +204,11 @@ BOOST_AUTO_TEST_CASE(plugin_registry_orders_dependencies_and_rejects_bad_graphs)
    broken.register_plugin(descriptor("broken", log, {fcl::app::plugin_id{.value = "missing"}}));
    BOOST_CHECK_THROW(static_cast<void>(broken.instantiate_enabled({})), std::logic_error);
 
-   BOOST_CHECK_THROW(
-      static_cast<void>(registry.instantiate_enabled({fcl::app::plugin_config{
-         .id = fcl::app::plugin_id{.value = "store"},
-         .enabled = false,
-      }})),
-      std::logic_error);
+   BOOST_CHECK_THROW(static_cast<void>(registry.instantiate_enabled({fcl::app::plugin_config{
+                         .id = fcl::app::plugin_id{.value = "store"},
+                         .enabled = false,
+                     }})),
+                     std::logic_error);
 }
 
 BOOST_AUTO_TEST_CASE(application_runtime_rolls_back_and_shutdown_is_idempotent) {

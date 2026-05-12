@@ -16,36 +16,36 @@ void append_json_string(std::string& out, std::string_view value) {
    out.push_back('"');
    for (const char c : value) {
       switch (c) {
-         case '"':
-            out += "\\\"";
-            break;
-         case '\\':
-            out += "\\\\";
-            break;
-         case '\b':
-            out += "\\b";
-            break;
-         case '\f':
-            out += "\\f";
-            break;
-         case '\n':
-            out += "\\n";
-            break;
-         case '\r':
-            out += "\\r";
-            break;
-         case '\t':
-            out += "\\t";
-            break;
-         default:
-            if (static_cast<unsigned char>(c) < 0x20) {
-               constexpr char hex[] = "0123456789abcdef";
-               out += "\\u00";
-               out.push_back(hex[(static_cast<unsigned char>(c) >> 4) & 0x0f]);
-               out.push_back(hex[static_cast<unsigned char>(c) & 0x0f]);
-            } else {
-               out.push_back(c);
-            }
+      case '"':
+         out += "\\\"";
+         break;
+      case '\\':
+         out += "\\\\";
+         break;
+      case '\b':
+         out += "\\b";
+         break;
+      case '\f':
+         out += "\\f";
+         break;
+      case '\n':
+         out += "\\n";
+         break;
+      case '\r':
+         out += "\\r";
+         break;
+      case '\t':
+         out += "\\t";
+         break;
+      default:
+         if (static_cast<unsigned char>(c) < 0x20) {
+            constexpr char hex[] = "0123456789abcdef";
+            out += "\\u00";
+            out.push_back(hex[(static_cast<unsigned char>(c) >> 4) & 0x0f]);
+            out.push_back(hex[static_cast<unsigned char>(c) & 0x0f]);
+         } else {
+            out.push_back(c);
+         }
       }
    }
    out.push_back('"');
@@ -81,29 +81,29 @@ void append_array_json(std::string& out, const fcl::variants& values) {
 
 void append_variant_json(std::string& out, const fcl::variant& value) {
    switch (value.get_type()) {
-      case fcl::variant::null_type:
-         out += "null";
-         break;
-      case fcl::variant::int64_type:
-      case fcl::variant::uint64_type:
-      case fcl::variant::double_type:
-         out += value.as_string();
-         break;
-      case fcl::variant::bool_type:
-         out += value.as_bool() ? "true" : "false";
-         break;
-      case fcl::variant::string_type:
-         append_json_string(out, value.get_string());
-         break;
-      case fcl::variant::array_type:
-         append_array_json(out, value.get_array());
-         break;
-      case fcl::variant::object_type:
-         append_object_json(out, value.get_object());
-         break;
-      case fcl::variant::blob_type:
-         append_json_string(out, value.as_string());
-         break;
+   case fcl::variant::null_type:
+      out += "null";
+      break;
+   case fcl::variant::int64_type:
+   case fcl::variant::uint64_type:
+   case fcl::variant::double_type:
+      out += value.as_string();
+      break;
+   case fcl::variant::bool_type:
+      out += value.as_bool() ? "true" : "false";
+      break;
+   case fcl::variant::string_type:
+      append_json_string(out, value.get_string());
+      break;
+   case fcl::variant::array_type:
+      append_array_json(out, value.get_array());
+      break;
+   case fcl::variant::object_type:
+      append_object_json(out, value.get_object());
+      break;
+   case fcl::variant::blob_type:
+      append_json_string(out, value.as_string());
+      break;
    }
 }
 
@@ -123,7 +123,8 @@ void clean_append(std::string& app, const std::string_view& s, size_t pos = 0, s
 namespace fcl {
 std::string format_string(const std::string& frmt, const variant_object& args, bool minimize) {
    std::string result;
-   const std::string format = (minimize && frmt.size() > minimize_max_size) ? frmt.substr(0, minimize_max_size) + "..." : frmt;
+   const std::string format =
+       (minimize && frmt.size() > minimize_max_size) ? frmt.substr(0, minimize_max_size) + "..." : frmt;
 
    const auto arg_num = (args.size() == 0) ? 1 : args.size();
    const auto max_format_size = std::max(minimize_max_size, format.size());

@@ -51,11 +51,11 @@ base_url parse_base_url(std::string_view value) {
 
    const auto& uri = parsed.value();
    auto result = base_url{
-      .original = std::string{value},
-      .scheme = std::string{uri.scheme()},
-      .host = std::string{uri.host()},
-      .port = std::string{uri.port()},
-      .base_path = std::string{uri.encoded_path()},
+       .original = std::string{value},
+       .scheme = std::string{uri.scheme()},
+       .host = std::string{uri.host()},
+       .port = std::string{uri.port()},
+       .base_path = std::string{uri.encoded_path()},
    };
 
    if (result.scheme != "http" && result.scheme != "https" && result.scheme != "ws" && result.scheme != "wss") {

@@ -22,13 +22,9 @@ struct codec_options {
 [[nodiscard]] std::vector<std::uint8_t> encode_message(const p2p_message& message, codec_options options = {});
 [[nodiscard]] p2p_message decode_message(std::span<const std::uint8_t> bytes, codec_options options = {});
 
-boost::asio::awaitable<void> async_write_message(
-   fcl::quic::framed_stream& stream,
-   const p2p_message& message,
-   codec_options options = {});
+boost::asio::awaitable<void> async_write_message(fcl::quic::framed_stream& stream, const p2p_message& message,
+                                                 codec_options options = {});
 
-boost::asio::awaitable<p2p_message> async_read_message(
-   fcl::quic::framed_stream& stream,
-   codec_options options = {});
+boost::asio::awaitable<p2p_message> async_read_message(fcl::quic::framed_stream& stream, codec_options options = {});
 
 } // namespace fcl::p2p

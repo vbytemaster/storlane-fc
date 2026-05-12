@@ -42,20 +42,15 @@ using asio::use_awaitable;
 namespace detail {
 
 class client_impl {
-public:
+ public:
    client_impl(fcl::asio::runtime& runtime_value, client_endpoint endpoint_value)
-      : runtime(runtime_value)
-      , endpoint(std::move(endpoint_value))
-      , strand(asio::make_strand(runtime.context()))
-      , resolver(strand)
-      , ssl_context(asio::ssl::context::tls_client) {
+       : runtime(runtime_value), endpoint(std::move(endpoint_value)), strand(asio::make_strand(runtime.context())),
+         resolver(strand), ssl_context(asio::ssl::context::tls_client) {
       ssl_context.set_default_verify_paths();
       ssl_context.set_verify_mode(asio::ssl::verify_peer);
    }
 
-   awaitable<connection::ptr> connect_coro(
-      std::string path,
-      client_options options) {
+   awaitable<connection::ptr> connect_coro(std::string path, client_options options) {
       auto results = co_await resolver.async_resolve(endpoint.host, endpoint.port, use_awaitable);
       if (endpoint.secure()) {
          auto stream = beast::ssl_stream<beast::tcp_stream>{strand, ssl_context};
@@ -99,13 +94,11 @@ public:
 } // namespace detail
 
 client::client(fcl::asio::runtime& runtime, client_endpoint endpoint)
-   : impl_(std::make_unique<detail::client_impl>(runtime, std::move(endpoint))) {}
+    : impl_(std::make_unique<detail::client_impl>(runtime, std::move(endpoint))) {}
 
 client::~client() = default;
 
-boost::asio::awaitable<connection::ptr> client::async_connect(
-   std::string_view path,
-   client_options options) {
+boost::asio::awaitable<connection::ptr> client::async_connect(std::string_view path, client_options options) {
    auto path_string = std::string{path};
    co_return co_await impl_->connect_coro(std::move(path_string), options);
 }

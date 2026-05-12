@@ -7,14 +7,9 @@ module fcl.crypto.types;
 
 namespace fcl::crypto {
 
-error::error(error_kind kind, std::string message)
-   : std::runtime_error(std::move(message))
-   , _kind(kind)
-{
-}
+error::error(error_kind kind, std::string message) : std::runtime_error(std::move(message)), _kind(kind) {}
 
-error_kind error::kind() const noexcept
-{
+error_kind error::kind() const noexcept {
    return _kind;
 }
 

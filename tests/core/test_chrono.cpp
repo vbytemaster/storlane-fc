@@ -6,8 +6,7 @@ import fcl.core.chrono;
 
 BOOST_AUTO_TEST_SUITE(core_chrono_test_suite)
 
-BOOST_AUTO_TEST_CASE(chrono_iso_roundtrip)
-{
+BOOST_AUTO_TEST_CASE(chrono_iso_roundtrip) {
    const std::chrono::sys_seconds one_second{std::chrono::seconds{1}};
    BOOST_CHECK_EQUAL(fcl::chrono::to_iso_string(one_second), "1970-01-01T00:00:01");
    BOOST_CHECK_EQUAL(fcl::chrono::to_non_delimited_iso_string(one_second), "19700101T000001");
@@ -19,14 +18,12 @@ BOOST_AUTO_TEST_CASE(chrono_iso_roundtrip)
    BOOST_CHECK(fcl::chrono::from_iso_time_point("1970-01-01T00:00:01.000") == one_second_us);
 }
 
-BOOST_AUTO_TEST_CASE(chrono_invalid_iso_fails)
-{
+BOOST_AUTO_TEST_CASE(chrono_invalid_iso_fails) {
    BOOST_CHECK_THROW(fcl::chrono::from_iso_seconds("not-a-time"), std::invalid_argument);
    BOOST_CHECK_THROW(fcl::chrono::from_iso_time_point("not-a-time"), std::invalid_argument);
 }
 
-BOOST_AUTO_TEST_CASE(chrono_wire_helpers_preserve_fc_layout_values)
-{
+BOOST_AUTO_TEST_CASE(chrono_wire_helpers_preserve_fc_layout_values) {
    const std::chrono::sys_time<std::chrono::microseconds> one_second_us{std::chrono::seconds{1}};
    BOOST_CHECK_EQUAL(fcl::chrono::to_fc_time_point_wire(one_second_us), 1'000'000u);
    BOOST_CHECK(fcl::chrono::from_fc_time_point_wire(1'000'000u) == one_second_us);

@@ -14,34 +14,31 @@ export module fcl.app.ports;
 export namespace fcl::app {
 
 class port_error : public std::runtime_error {
-public:
+ public:
    explicit port_error(std::string message);
 };
 
 class port_base {
-public:
+ public:
    virtual ~port_base() = default;
 };
 
-template <typename Port>
-class port_holder final : public port_base {
-public:
-   explicit port_holder(std::shared_ptr<Port> value)
-      : value_(std::move(value)) {}
+template <typename Port> class port_holder final : public port_base {
+ public:
+   explicit port_holder(std::shared_ptr<Port> value) : value_(std::move(value)) {}
 
    std::shared_ptr<Port> value_;
 };
 
 class port_registry {
-public:
+ public:
    port_registry();
    ~port_registry();
 
    port_registry(const port_registry&) = delete;
    port_registry& operator=(const port_registry&) = delete;
 
-   template <typename Port>
-   void install(std::shared_ptr<Port> port) {
+   template <typename Port> void install(std::shared_ptr<Port> port) {
       static_assert(std::is_class_v<Port>, "app port must be a class/interface type");
       static_assert(std::has_virtual_destructor_v<Port>, "app port must have a virtual destructor");
       if (!port) {
@@ -54,8 +51,7 @@ public:
       ports_.emplace(key, std::make_unique<port_holder<Port>>(std::move(port)));
    }
 
-   template <typename Port>
-   [[nodiscard]] std::shared_ptr<Port> try_get() const {
+   template <typename Port> [[nodiscard]] std::shared_ptr<Port> try_get() const {
       const auto iterator = ports_.find(std::type_index(typeid(Port)));
       if (iterator == ports_.end()) {
          return {};
@@ -67,8 +63,7 @@ public:
       return holder->value_;
    }
 
-   template <typename Port>
-   [[nodiscard]] std::shared_ptr<Port> get() const {
+   template <typename Port> [[nodiscard]] std::shared_ptr<Port> get() const {
       auto port = try_get<Port>();
       if (!port) {
          throw port_error{"required app port is not installed"};
@@ -76,15 +71,14 @@ public:
       return port;
    }
 
-   template <typename Port>
-   void remove() {
+   template <typename Port> void remove() {
       ports_.erase(std::type_index(typeid(Port)));
    }
 
    [[nodiscard]] std::size_t size() const noexcept;
    void clear() noexcept;
 
-private:
+ private:
    std::unordered_map<std::type_index, std::unique_ptr<port_base>> ports_;
 };
 

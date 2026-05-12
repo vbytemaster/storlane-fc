@@ -34,12 +34,12 @@ export namespace fcl::schema {
 
 [[nodiscard]] inline std::optional<std::string> enum_to_string(severity value) {
    switch (value) {
-      case severity::info:
-         return "info";
-      case severity::warning:
-         return "warning";
-      case severity::error:
-         return "error";
+   case severity::info:
+      return "info";
+   case severity::warning:
+      return "warning";
+   case severity::error:
+      return "error";
    }
    return std::nullopt;
 }
@@ -60,8 +60,7 @@ export namespace fcl::schema {
    return false;
 }
 
-template <typename E>
-[[nodiscard]] bool enum_from_string(std::string_view name, E& out) {
+template <typename E> [[nodiscard]] bool enum_from_string(std::string_view name, E& out) {
    static_assert(std::is_enum_v<E>, "enum_from_string requires an enum type");
    auto matched = false;
    boost::mp11::mp_for_each<boost::describe::describe_enumerators<E>>([&](auto descriptor) {
@@ -73,8 +72,7 @@ template <typename E>
    return matched;
 }
 
-template <typename E>
-[[nodiscard]] std::optional<std::string> enum_to_string(E value) {
+template <typename E> [[nodiscard]] std::optional<std::string> enum_to_string(E value) {
    static_assert(std::is_enum_v<E>, "enum_to_string requires an enum type");
    auto result = std::optional<std::string>{};
    boost::mp11::mp_for_each<boost::describe::describe_enumerators<E>>([&](auto descriptor) {
@@ -85,8 +83,7 @@ template <typename E>
    return result;
 }
 
-template <typename E>
-[[nodiscard]] bool enum_from_int(std::int64_t value, E& out) {
+template <typename E> [[nodiscard]] bool enum_from_int(std::int64_t value, E& out) {
    static_assert(std::is_enum_v<E>, "enum_from_int requires an enum type");
    auto matched = false;
    boost::mp11::mp_for_each<boost::describe::describe_enumerators<E>>([&](auto descriptor) {

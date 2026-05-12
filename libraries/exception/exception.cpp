@@ -11,28 +11,24 @@ module fcl.exception.exception;
 
 namespace {
 
-std::mutex& sink_mutex()
-{
+std::mutex& sink_mutex() {
    static std::mutex mutex;
    return mutex;
 }
 
-fcl::error::log_sink& sink_ref()
-{
+fcl::error::log_sink& sink_ref() {
    static fcl::error::log_sink sink;
    return sink;
 }
 
-std::string sanitize_value(std::string_view value, bool redacted)
-{
+std::string sanitize_value(std::string_view value, bool redacted) {
    if (redacted) {
       return "<redacted>";
    }
    return std::string(value);
 }
 
-void append_exception_chain(std::ostream& out, const std::exception& exception, int depth)
-{
+void append_exception_chain(std::ostream& out, const std::exception& exception, int depth) {
    for (int i = 0; i < depth; ++i) {
       out << "caused by: ";
    }
@@ -61,55 +57,78 @@ void append_exception_chain(std::ostream& out, const std::exception& exception, 
 
 namespace fcl::error {
 
-field ctx(std::string_view key, std::string value)
-{
+field ctx(std::string_view key, std::string value) {
    return field{std::string(key), std::move(value), false};
 }
 
-field ctx(std::string_view key, std::string_view value)
-{
+field ctx(std::string_view key, std::string_view value) {
    return ctx(key, std::string(value));
 }
 
-field ctx(std::string_view key, const char* value)
-{
+field ctx(std::string_view key, const char* value) {
    return ctx(key, value ? std::string(value) : std::string("<null>"));
 }
 
-field ctx(std::string_view key, bool value) { return ctx(key, value ? "true" : "false"); }
-field ctx(std::string_view key, char value) { return ctx(key, std::string(1, value)); }
-field ctx(std::string_view key, signed char value) { return ctx(key, static_cast<long long>(value)); }
-field ctx(std::string_view key, unsigned char value) { return ctx(key, static_cast<unsigned long long>(value)); }
-field ctx(std::string_view key, short value) { return ctx(key, static_cast<long long>(value)); }
-field ctx(std::string_view key, unsigned short value) { return ctx(key, static_cast<unsigned long long>(value)); }
-field ctx(std::string_view key, int value) { return ctx(key, static_cast<long long>(value)); }
-field ctx(std::string_view key, unsigned value) { return ctx(key, static_cast<unsigned long long>(value)); }
-field ctx(std::string_view key, long value) { return ctx(key, static_cast<long long>(value)); }
-field ctx(std::string_view key, unsigned long value) { return ctx(key, static_cast<unsigned long long>(value)); }
-field ctx(std::string_view key, long long value) { return ctx(key, std::to_string(value)); }
-field ctx(std::string_view key, unsigned long long value) { return ctx(key, std::to_string(value)); }
-field ctx(std::string_view key, float value) { return ctx(key, std::to_string(value)); }
-field ctx(std::string_view key, double value) { return ctx(key, std::to_string(value)); }
-field ctx(std::string_view key, long double value) { return ctx(key, std::to_string(static_cast<double>(value))); }
+field ctx(std::string_view key, bool value) {
+   return ctx(key, value ? "true" : "false");
+}
+field ctx(std::string_view key, char value) {
+   return ctx(key, std::string(1, value));
+}
+field ctx(std::string_view key, signed char value) {
+   return ctx(key, static_cast<long long>(value));
+}
+field ctx(std::string_view key, unsigned char value) {
+   return ctx(key, static_cast<unsigned long long>(value));
+}
+field ctx(std::string_view key, short value) {
+   return ctx(key, static_cast<long long>(value));
+}
+field ctx(std::string_view key, unsigned short value) {
+   return ctx(key, static_cast<unsigned long long>(value));
+}
+field ctx(std::string_view key, int value) {
+   return ctx(key, static_cast<long long>(value));
+}
+field ctx(std::string_view key, unsigned value) {
+   return ctx(key, static_cast<unsigned long long>(value));
+}
+field ctx(std::string_view key, long value) {
+   return ctx(key, static_cast<long long>(value));
+}
+field ctx(std::string_view key, unsigned long value) {
+   return ctx(key, static_cast<unsigned long long>(value));
+}
+field ctx(std::string_view key, long long value) {
+   return ctx(key, std::to_string(value));
+}
+field ctx(std::string_view key, unsigned long long value) {
+   return ctx(key, std::to_string(value));
+}
+field ctx(std::string_view key, float value) {
+   return ctx(key, std::to_string(value));
+}
+field ctx(std::string_view key, double value) {
+   return ctx(key, std::to_string(value));
+}
+field ctx(std::string_view key, long double value) {
+   return ctx(key, std::to_string(static_cast<double>(value)));
+}
 
-field secret(std::string_view key, std::string value)
-{
+field secret(std::string_view key, std::string value) {
    static_cast<void>(value);
    return field{std::string(key), "<redacted>", true};
 }
 
-field secret(std::string_view key, std::string_view value)
-{
+field secret(std::string_view key, std::string_view value) {
    return secret(key, std::string(value));
 }
 
-field secret(std::string_view key, const char* value)
-{
+field secret(std::string_view key, const char* value) {
    return secret(key, value ? std::string(value) : std::string{});
 }
 
-std::string format_fields(const fields& context)
-{
+std::string format_fields(const fields& context) {
    if (context.empty()) {
       return {};
    }
@@ -126,12 +145,8 @@ std::string format_fields(const fields& context)
    return out.str();
 }
 
-std::string format_context_message(
-   std::string_view message,
-   const fields& context,
-   const std::source_location& location,
-   const std::error_code& code)
-{
+std::string format_context_message(std::string_view message, const fields& context,
+                                   const std::source_location& location, const std::error_code& code) {
    std::ostringstream out;
    out << message;
 
@@ -151,33 +166,30 @@ std::string format_context_message(
    return out.str();
 }
 
-context_error::context_error(
-   std::string message,
-   fields context,
-   std::source_location location,
-   std::error_code code)
-   : std::runtime_error(format_context_message(message, context, location, code))
-   , _message(std::move(message))
-   , _context(std::move(context))
-   , _location(location)
-   , _code(std::move(code))
-{
+context_error::context_error(std::string message, fields context, std::source_location location, std::error_code code)
+    : std::runtime_error(format_context_message(message, context, location, code)), _message(std::move(message)),
+      _context(std::move(context)), _location(location), _code(std::move(code)) {}
+
+const std::string& context_error::message() const noexcept {
+   return _message;
+}
+const fields& context_error::context() const noexcept {
+   return _context;
+}
+const std::source_location& context_error::location() const noexcept {
+   return _location;
+}
+const std::error_code& context_error::code() const noexcept {
+   return _code;
 }
 
-const std::string& context_error::message() const noexcept { return _message; }
-const fields& context_error::context() const noexcept { return _context; }
-const std::source_location& context_error::location() const noexcept { return _location; }
-const std::error_code& context_error::code() const noexcept { return _code; }
-
-std::string format_exception_chain(const std::exception& exception)
-{
+std::string format_exception_chain(const std::exception& exception) {
    std::ostringstream out;
    append_exception_chain(out, exception, 0);
    return out.str();
 }
 
-std::string format_current_exception()
-{
+std::string format_current_exception() {
    try {
       throw;
    } catch (const std::exception& exception) {
@@ -187,14 +199,12 @@ std::string format_current_exception()
    }
 }
 
-void set_log_sink(log_sink sink)
-{
+void set_log_sink(log_sink sink) {
    std::lock_guard lock(sink_mutex());
    sink_ref() = std::move(sink);
 }
 
-void log_current_exception(std::string_view message, fields context)
-{
+void log_current_exception(std::string_view message, fields context) {
    std::ostringstream out;
    if (!message.empty()) {
       out << message;
@@ -214,45 +224,28 @@ void log_current_exception(std::string_view message, fields context)
    }
 }
 
-void throw_context_error(
-   std::string_view message,
-   fields context,
-   std::source_location location,
-   std::error_code code)
-{
+void throw_context_error(std::string_view message, fields context, std::source_location location,
+                         std::error_code code) {
    throw context_error(std::string(message), std::move(context), location, std::move(code));
 }
 
-void throw_assertion_error(
-   std::string_view expression,
-   std::string_view message,
-   fields context,
-   std::source_location location)
-{
+void throw_assertion_error(std::string_view expression, std::string_view message, fields context,
+                           std::source_location location) {
    context.insert(context.begin(), ctx("expression", expression));
    if (message.empty()) {
-      throw context_error("assertion failed", std::move(context), location, std::make_error_code(std::errc::invalid_argument));
+      throw context_error("assertion failed", std::move(context), location,
+                          std::make_error_code(std::errc::invalid_argument));
    }
-   throw context_error(std::string(message), std::move(context), location, std::make_error_code(std::errc::invalid_argument));
+   throw context_error(std::string(message), std::move(context), location,
+                       std::make_error_code(std::errc::invalid_argument));
 }
 
-void throw_timeout_error(
-   std::string_view message,
-   fields context,
-   std::source_location location)
-{
-   throw context_error(
-      message.empty() ? "deadline exceeded" : std::string(message),
-      std::move(context),
-      location,
-      std::make_error_code(std::errc::timed_out));
+void throw_timeout_error(std::string_view message, fields context, std::source_location location) {
+   throw context_error(message.empty() ? "deadline exceeded" : std::string(message), std::move(context), location,
+                       std::make_error_code(std::errc::timed_out));
 }
 
-void rethrow_with_context(
-   std::string_view message,
-   fields context,
-   std::source_location location)
-{
+void rethrow_with_context(std::string_view message, fields context, std::source_location location) {
    std::throw_with_nested(context_error(std::string(message), std::move(context), location));
 }
 

@@ -20,17 +20,14 @@ import fcl.schema.value_kind;
 
 export namespace fcl::schema {
 
-template <typename T>
-struct member_pointer_traits;
+template <typename T> struct member_pointer_traits;
 
-template <typename Object, typename Member>
-struct member_pointer_traits<Member Object::*> {
+template <typename Object, typename Member> struct member_pointer_traits<Member Object::*> {
    using object_type = Object;
    using member_type = Member;
 };
 
-template <typename T>
-[[nodiscard]] T cast_any_to(const std::any& value) {
+template <typename T> [[nodiscard]] T cast_any_to(const std::any& value) {
    using clean_type = std::remove_cvref_t<T>;
    if (value.type() == typeid(clean_type)) {
       return std::any_cast<clean_type>(value);
@@ -81,8 +78,7 @@ template <typename T>
    return std::any_cast<clean_type>(value);
 }
 
-template <typename T>
-struct field_rule {
+template <typename T> struct field_rule {
    std::string name;
    std::vector<std::string> aliases;
    value_kind kind = value_kind::string;
@@ -101,17 +97,13 @@ struct field_rule {
    std::function<std::any(const T&)> read_any;
 };
 
-template <typename T>
-class field_builder;
+template <typename T> class field_builder;
 
-template <typename T>
-class object_schema {
-public:
-   object_schema()
-      : fields_{std::make_shared<std::vector<field_rule<T>>>()} {}
+template <typename T> class object_schema {
+ public:
+   object_schema() : fields_{std::make_shared<std::vector<field_rule<T>>>()} {}
 
-   template <auto Member>
-   [[nodiscard]] field_builder<T> field(std::string name) {
+   template <auto Member> [[nodiscard]] field_builder<T> field(std::string name) {
       using pointer_traits = member_pointer_traits<decltype(Member)>;
       using object_type = typename pointer_traits::object_type;
       using member_type = std::remove_cvref_t<typename pointer_traits::member_type>;
@@ -121,13 +113,9 @@ public:
       rule.name = std::move(name);
       rule.kind = member_kind<member_type>::value;
       rule.type = std::type_index{typeid(member_type)};
-      rule.assign_any = [](T& object, const std::any& value) {
-         object.*Member = cast_any_to<member_type>(value);
-      };
-      rule.read_any = [](const T& object) -> std::any {
-         return object.*Member;
-      };
-      rule.apply_default = [state = fields_, index = fields_->size()] (T& object) {
+      rule.assign_any = [](T& object, const std::any& value) { object.*Member = cast_any_to<member_type>(value); };
+      rule.read_any = [](const T& object) -> std::any { return object.*Member; };
+      rule.apply_default = [state = fields_, index = fields_->size()](T& object) {
          const auto& self = (*state)[index];
          if (self.has_default) {
             self.assign_any(object, self.default_value);
@@ -158,20 +146,22 @@ public:
          auto numeric = std::optional<long double>{};
          try {
             switch (field.kind) {
-               case value_kind::signed_integer:
-                  numeric = static_cast<long double>(std::any_cast<std::int64_t>(coerce_signed(field.read_any(object))));
-                  break;
-               case value_kind::unsigned_integer:
-                  numeric = static_cast<long double>(std::any_cast<std::uint64_t>(coerce_unsigned(field.read_any(object))));
-                  break;
-               case value_kind::floating:
-                  numeric = std::any_cast<long double>(coerce_floating(field.read_any(object)));
-                  break;
-               default:
-                  break;
+            case value_kind::signed_integer:
+               numeric = static_cast<long double>(std::any_cast<std::int64_t>(coerce_signed(field.read_any(object))));
+               break;
+            case value_kind::unsigned_integer:
+               numeric =
+                   static_cast<long double>(std::any_cast<std::uint64_t>(coerce_unsigned(field.read_any(object))));
+               break;
+            case value_kind::floating:
+               numeric = std::any_cast<long double>(coerce_floating(field.read_any(object)));
+               break;
+            default:
+               break;
             }
          } catch (...) {
-            result.push_back(make_error(base_path, field.name, "schema.type", "value cannot be inspected for range validation"));
+            result.push_back(
+                make_error(base_path, field.name, "schema.type", "value cannot be inspected for range validation"));
             continue;
          }
 
@@ -188,7 +178,7 @@ public:
       return result;
    }
 
-private:
+ private:
    friend class field_builder<T>;
 
    field_rule<T>& field_at(std::size_t index) {
@@ -246,39 +236,36 @@ private:
       return value;
    }
 
-   static diagnostic make_error(std::string_view base_path, const std::string& field, std::string code, std::string message) {
+   static diagnostic make_error(std::string_view base_path, const std::string& field, std::string code,
+                                std::string message) {
       auto path = std::string{base_path};
       if (!path.empty()) {
          path += ".";
       }
       path += field;
-      return diagnostic{.path = std::move(path), .code = std::move(code), .level = severity::error, .message = std::move(message)};
+      return diagnostic{
+          .path = std::move(path), .code = std::move(code), .level = severity::error, .message = std::move(message)};
    }
 
    std::shared_ptr<std::vector<field_rule<T>>> fields_;
 };
 
-template <typename T>
-class field_builder {
-public:
-   field_builder(object_schema<T> schema, std::size_t index)
-      : schema_{std::move(schema)}
-      , index_{index} {}
+template <typename T> class field_builder {
+ public:
+   field_builder(object_schema<T> schema, std::size_t index) : schema_{std::move(schema)}, index_{index} {}
 
    field_builder& required() {
       current().required = true;
       return *this;
    }
 
-   template <typename Value>
-   field_builder& default_value(Value&& value) {
+   template <typename Value> field_builder& default_value(Value&& value) {
       current().has_default = true;
       current().default_value = std::forward<Value>(value);
       return *this;
    }
 
-   template <typename Min, typename Max>
-   field_builder& range(Min min, Max max) {
+   template <typename Min, typename Max> field_builder& range(Min min, Max max) {
       current().minimum = static_cast<long double>(min);
       current().maximum = static_cast<long double>(max);
       return *this;
@@ -305,8 +292,7 @@ public:
       return *this;
    }
 
-   template <auto Member>
-   [[nodiscard]] field_builder field(std::string name) {
+   template <auto Member> [[nodiscard]] field_builder field(std::string name) {
       return schema_.template field<Member>(std::move(name));
    }
 
@@ -314,7 +300,7 @@ public:
       return schema_;
    }
 
-private:
+ private:
    field_rule<T>& current() {
       return schema_.field_at(index_);
    }
@@ -323,13 +309,11 @@ private:
    std::size_t index_ = 0;
 };
 
-template <typename T>
-[[nodiscard]] object_schema<T> object() {
+template <typename T> [[nodiscard]] object_schema<T> object() {
    return object_schema<T>{};
 }
 
-template <typename T>
-struct rules {
+template <typename T> struct rules {
    [[nodiscard]] static object_schema<T> define() {
       return object<T>();
    }

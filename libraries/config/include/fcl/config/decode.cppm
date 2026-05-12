@@ -20,20 +20,19 @@ import fcl.schema;
 
 export namespace fcl::config {
 
-template <typename T>
-[[nodiscard]] component_descriptor describe_component(std::string section) {
+template <typename T> [[nodiscard]] component_descriptor describe_component(std::string section) {
    auto descriptor = component_descriptor{.section = std::move(section)};
    const auto rules = schema::rules<T>::define();
    for (const auto& field : rules.fields()) {
       descriptor.fields.push_back(field_descriptor{
-         .name = field.name,
-         .aliases = field.aliases,
-         .kind = field.kind,
-         .required = field.required,
-         .secret = field.secret,
-         .deprecated = field.deprecated,
-         .deprecated_message = field.deprecated_message,
-         .description = field.description,
+          .name = field.name,
+          .aliases = field.aliases,
+          .kind = field.kind,
+          .required = field.required,
+          .secret = field.secret,
+          .deprecated = field.deprecated,
+          .deprecated_message = field.deprecated_message,
+          .description = field.description,
       });
    }
    return descriptor;
@@ -43,14 +42,12 @@ struct decode_diagnostics {
    std::vector<schema::diagnostic> entries;
 
    [[nodiscard]] bool ok() const {
-      return std::ranges::none_of(entries, [](const schema::diagnostic& entry) {
-         return entry.level == schema::severity::error;
-      });
+      return std::ranges::none_of(
+          entries, [](const schema::diagnostic& entry) { return entry.level == schema::severity::error; });
    }
 };
 
-template <typename T>
-struct decode_result {
+template <typename T> struct decode_result {
    T value{};
    decode_diagnostics diagnostics;
 
@@ -63,8 +60,7 @@ struct decode_result {
 [[nodiscard]] std::any value_to_any(const value& input, schema::value_kind kind);
 [[nodiscard]] value any_to_value(schema::value_kind kind, const std::any& input);
 
-template <typename T>
-[[nodiscard]] decode_result<T> decode(const document& source, std::string_view section = {}) {
+template <typename T> [[nodiscard]] decode_result<T> decode(const document& source, std::string_view section = {}) {
    auto result = decode_result<T>{};
    const auto rules = schema::rules<T>::define();
    rules.apply_defaults(result.value);
@@ -84,10 +80,10 @@ template <typename T>
             }
             full_path += name;
             result.diagnostics.entries.push_back(schema::diagnostic{
-               .path = std::move(full_path),
-               .code = "config.unknown",
-               .level = schema::severity::warning,
-               .message = "unknown config field",
+                .path = std::move(full_path),
+                .code = "config.unknown",
+                .level = schema::severity::warning,
+                .message = "unknown config field",
             });
          }
       }
@@ -119,10 +115,10 @@ template <typename T>
       if (!found) {
          if (field.required) {
             result.diagnostics.entries.push_back(schema::diagnostic{
-               .path = std::move(field_path),
-               .code = "config.required",
-               .level = schema::severity::error,
-               .message = "required config field is missing",
+                .path = std::move(field_path),
+                .code = "config.required",
+                .level = schema::severity::error,
+                .message = "required config field is missing",
             });
          }
          continue;
@@ -130,10 +126,10 @@ template <typename T>
 
       if (field.deprecated) {
          result.diagnostics.entries.push_back(schema::diagnostic{
-            .path = field_path,
-            .code = "config.deprecated",
-            .level = schema::severity::warning,
-            .message = field.deprecated_message.empty() ? "deprecated config field" : field.deprecated_message,
+             .path = field_path,
+             .code = "config.deprecated",
+             .level = schema::severity::warning,
+             .message = field.deprecated_message.empty() ? "deprecated config field" : field.deprecated_message,
          });
       }
 
@@ -141,10 +137,10 @@ template <typename T>
          field.assign_any(result.value, value_to_any(*found, field.kind));
       } catch (const std::exception& error) {
          result.diagnostics.entries.push_back(schema::diagnostic{
-            .path = std::move(field_path),
-            .code = "config.type",
-            .level = schema::severity::error,
-            .message = error.what(),
+             .path = std::move(field_path),
+             .code = "config.type",
+             .level = schema::severity::error,
+             .message = error.what(),
          });
       }
    }
@@ -154,8 +150,7 @@ template <typename T>
    return result;
 }
 
-template <typename T>
-[[nodiscard]] document defaults_for(std::string_view section) {
+template <typename T> [[nodiscard]] document defaults_for(std::string_view section) {
    auto output = document{};
    const auto rules = schema::rules<T>::define();
    for (const auto& field : rules.fields()) {

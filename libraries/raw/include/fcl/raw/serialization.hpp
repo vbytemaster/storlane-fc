@@ -13,26 +13,23 @@
 //
 // The macros intentionally do not declare new public types or functions.
 
-#define FCL_SERIALIZATION_VARIANT(ext, type) \
-   namespace fcl { \
-   ext template void from_variant<type>(const variant& v, type& value); \
-   ext template void to_variant<type>(const type& value, variant& v); \
+#define FCL_SERIALIZATION_VARIANT(ext, type)                                                                           \
+   namespace fcl {                                                                                                     \
+   ext template void from_variant<type>(const variant& v, type& value);                                                \
+   ext template void to_variant<type>(const type& value, variant& v);                                                  \
    }
 
-#define FCL_SERIALIZATION_PACK(ext, type) \
-   namespace fcl::raw { \
-   ext template void pack<fcl::datastream<std::size_t>, type>( \
-      fcl::datastream<std::size_t>& stream, const type& value); \
-   ext template void pack<fcl::sha256::encoder, type>( \
-      fcl::sha256::encoder& stream, const type& value); \
-   ext template void pack<fcl::datastream<char*>, type>( \
-      fcl::datastream<char*>& stream, const type& value); \
-   ext template void unpack<fcl::datastream<const char*>, type>( \
-      fcl::datastream<const char*>& stream, type& value); \
+#define FCL_SERIALIZATION_PACK(ext, type)                                                                              \
+   namespace fcl::raw {                                                                                                \
+   ext template void pack<fcl::datastream<std::size_t>, type>(fcl::datastream<std::size_t> & stream,                   \
+                                                              const type& value);                                      \
+   ext template void pack<fcl::sha256::encoder, type>(fcl::sha256::encoder & stream, const type& value);               \
+   ext template void pack<fcl::datastream<char*>, type>(fcl::datastream<char*> & stream, const type& value);           \
+   ext template void unpack<fcl::datastream<const char*>, type>(fcl::datastream<const char*> & stream, type& value);   \
    }
 
-#define FCL_SERIALIZATION(ext, type) \
-   FCL_SERIALIZATION_VARIANT(ext, type) \
+#define FCL_SERIALIZATION(ext, type)                                                                                   \
+   FCL_SERIALIZATION_VARIANT(ext, type)                                                                                \
    FCL_SERIALIZATION_PACK(ext, type)
 
 #define FCL_DECLARE_SERIALIZATION(type) FCL_SERIALIZATION(extern, type)

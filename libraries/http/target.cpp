@@ -19,9 +19,9 @@ target parse_target(std::string_view value) {
 
    const auto& url = parsed.value();
    auto result = target{
-      .original = std::string{value},
-      .path = url.path(),
-      .query = url.query(),
+       .original = std::string{value},
+       .path = url.path(),
+       .query = url.query(),
    };
 
    for (const auto segment : url.segments()) {
@@ -29,9 +29,9 @@ target parse_target(std::string_view value) {
    }
    for (const auto param : url.params()) {
       result.query_params.push_back(query_param{
-         .key = param.key,
-         .value = param.value,
-         .has_value = param.has_value,
+          .key = param.key,
+          .value = param.value,
+          .has_value = param.has_value,
       });
    }
 

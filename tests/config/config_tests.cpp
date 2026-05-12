@@ -23,8 +23,7 @@ struct http_config {
 
 BOOST_DESCRIBE_STRUCT(http_config, (), (bind_port, bind_host, tls_enabled, tags, token))
 
-template <>
-struct fcl::schema::rules<http_config> {
+template <> struct fcl::schema::rules<http_config> {
    [[nodiscard]] static fcl::schema::object_schema<http_config> define() {
       auto schema = fcl::schema::object<http_config>();
       schema.field<&http_config::bind_port>("bind-port").alias("port").required().default_value(8080).range(1, 65535);

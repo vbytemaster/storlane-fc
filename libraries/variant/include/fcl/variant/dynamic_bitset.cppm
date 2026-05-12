@@ -9,4 +9,3 @@ export namespace fcl {
 using dynamic_bitset = boost::dynamic_bitset<std::uint8_t>;
 
 } // namespace fcl
-

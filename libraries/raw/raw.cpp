@@ -1,2 +1,1 @@
-namespace fcl::raw {
-}
+namespace fcl::raw {}

@@ -26,8 +26,7 @@ import fcl.schema;
 import fcl.variant;
 import fcl.yaml;
 
-template <>
-struct fcl::schema::rules<fcl_yaml_tests::http_config> {
+template <> struct fcl::schema::rules<fcl_yaml_tests::http_config> {
    [[nodiscard]] static fcl::schema::object_schema<fcl_yaml_tests::http_config> define() {
       auto schema = fcl::schema::object<fcl_yaml_tests::http_config>();
       schema.field<&fcl_yaml_tests::http_config::bind_port>("bind-port").required().default_value(8080).range(1, 65535);
@@ -41,15 +40,14 @@ struct fcl::schema::rules<fcl_yaml_tests::http_config> {
 BOOST_AUTO_TEST_SUITE(yaml_codec_tests)
 
 BOOST_AUTO_TEST_CASE(yaml_value_roundtrip_preserves_scalars_lists_and_maps) {
-   const auto parsed = fcl::yaml::read_value(
-      "flag: true\n"
-      "i: -2\n"
-      "u: 7\n"
-      "d: 3.5\n"
-      "s: x\n"
-      "a:\n"
-      "  - 1\n"
-      "  - b\n");
+   const auto parsed = fcl::yaml::read_value("flag: true\n"
+                                             "i: -2\n"
+                                             "u: 7\n"
+                                             "d: 3.5\n"
+                                             "s: x\n"
+                                             "a:\n"
+                                             "  - 1\n"
+                                             "  - b\n");
 
    BOOST_REQUIRE(parsed.ok());
    const auto& object = parsed.value.get_object();
@@ -85,12 +83,11 @@ BOOST_AUTO_TEST_CASE(yaml_document_roundtrip_uses_config_document) {
 }
 
 BOOST_AUTO_TEST_CASE(yaml_typed_read_uses_schema_defaults_validation_and_unknown_policy) {
-   const auto parsed = fcl::yaml::read<fcl_yaml_tests::http_config>(
-      "bind-port: 9090\n"
-      "tls-enabled: false\n"
-      "tags:\n"
-      "  - alpha\n"
-      "extra: 1\n");
+   const auto parsed = fcl::yaml::read<fcl_yaml_tests::http_config>("bind-port: 9090\n"
+                                                                    "tls-enabled: false\n"
+                                                                    "tags:\n"
+                                                                    "  - alpha\n"
+                                                                    "extra: 1\n");
    BOOST_REQUIRE(parsed.ok());
    BOOST_TEST(parsed.value.bind_port == 9090U);
    BOOST_TEST(parsed.value.bind_host == "127.0.0.1");
@@ -100,10 +97,9 @@ BOOST_AUTO_TEST_CASE(yaml_typed_read_uses_schema_defaults_validation_and_unknown
 
    auto options = fcl::yaml::read_options{};
    options.unknown_fields = fcl::yaml::unknown_field_policy::error;
-   const auto rejected = fcl::yaml::read<fcl_yaml_tests::http_config>(
-      "bind-port: 9090\n"
-      "extra: 1\n",
-      options);
+   const auto rejected = fcl::yaml::read<fcl_yaml_tests::http_config>("bind-port: 9090\n"
+                                                                      "extra: 1\n",
+                                                                      options);
    BOOST_TEST(!rejected.ok());
 
    const auto invalid = fcl::yaml::read<fcl_yaml_tests::http_config>("bind-port: 0\n");

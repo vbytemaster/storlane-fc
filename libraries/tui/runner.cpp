@@ -19,7 +19,7 @@ namespace fcl::tui {
 namespace {
 
 class notcurses_session {
-public:
+ public:
    notcurses_session() {
       auto options = notcurses_options{};
       options.flags = NCOPTION_SUPPRESS_BANNERS | NCOPTION_DRAIN_INPUT;
@@ -42,7 +42,7 @@ public:
       return nc_;
    }
 
-private:
+ private:
    notcurses* nc_ = nullptr;
 };
 
@@ -79,11 +79,11 @@ terminal_capabilities capabilities_from(notcurses* nc) {
    auto cols = unsigned{0};
    notcurses_stddim_yx(nc, &rows, &cols);
    return terminal_capabilities{
-      .available = true,
-      .colors = notcurses_cantruecolor(nc) ? color_mode::truecolor : color_mode::ansi_256,
-      .unicode = notcurses_canutf8(nc),
-      .width = cols,
-      .height = rows,
+       .available = true,
+       .colors = notcurses_cantruecolor(nc) ? color_mode::truecolor : color_mode::ansi_256,
+       .unicode = notcurses_canutf8(nc),
+       .width = cols,
+       .height = rows,
    };
 }
 
@@ -135,10 +135,10 @@ int screen_runner::run(screen_runner_options options) {
       }
    } catch (const std::exception& error) {
       capabilities_ = terminal_capabilities{
-         .available = false,
-         .colors = color_mode::unknown,
-         .unicode = false,
-         .degraded_reason = error.what(),
+          .available = false,
+          .colors = color_mode::unknown,
+          .unicode = false,
+          .degraded_reason = error.what(),
       };
       return 5;
    }
@@ -163,10 +163,10 @@ terminal_capabilities detect_terminal_capabilities() {
       return capabilities_from(session.get());
    } catch (const std::exception& error) {
       return terminal_capabilities{
-         .available = false,
-         .colors = color_mode::unknown,
-         .unicode = false,
-         .degraded_reason = error.what(),
+          .available = false,
+          .colors = color_mode::unknown,
+          .unicode = false,
+          .degraded_reason = error.what(),
       };
    }
 }

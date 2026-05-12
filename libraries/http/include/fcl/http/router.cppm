@@ -18,7 +18,7 @@ export namespace fcl::http {
 using websocket_route_handler = std::function<void(std::shared_ptr<fcl::websocket::connection>)>;
 
 class router {
-public:
+ public:
    void use(middleware handler);
 
    void get(std::string path, route_handler handler);
@@ -30,7 +30,7 @@ public:
    [[nodiscard]] response handle(route_context& context) const;
    [[nodiscard]] std::optional<websocket_route_handler> match_websocket(route_context& context) const;
 
-private:
+ private:
    struct route_entry {
       method verb;
       std::string path;

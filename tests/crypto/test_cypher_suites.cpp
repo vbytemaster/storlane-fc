@@ -22,7 +22,8 @@ BOOST_AUTO_TEST_CASE(test_k1) try {
 
    BOOST_CHECK_EQUAL(private_key_string, test_private_key.to_string({}));
    BOOST_CHECK_EQUAL(expected_public_key, test_public_key.to_string({}));
-} FCL_LOG_AND_RETHROW();
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(test_r1) try {
    auto private_key_string = std::string("PVT_R1_iyQmnyPEGvFd8uffnk152WC2WryBjgTrg22fXQryuGL9mU6qW");
@@ -32,7 +33,8 @@ BOOST_AUTO_TEST_CASE(test_r1) try {
 
    BOOST_CHECK_EQUAL(private_key_string, test_private_key.to_string({}));
    BOOST_CHECK_EQUAL(expected_public_key, test_public_key.to_string({}));
-} FCL_LOG_AND_RETHROW();
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(test_k1_recovery) try {
    auto payload = "Test Cases";
@@ -45,7 +47,8 @@ BOOST_AUTO_TEST_CASE(test_k1_recovery) try {
    std::cout << recovered_pub.to_string({}) << std::endl;
 
    BOOST_CHECK_EQUAL(recovered_pub.to_string({}), pub.to_string({}));
-} FCL_LOG_AND_RETHROW();
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(test_r1_recovery) try {
    auto payload = "Test Cases";
@@ -58,7 +61,8 @@ BOOST_AUTO_TEST_CASE(test_r1_recovery) try {
    std::cout << recovered_pub.to_string({}) << std::endl;
 
    BOOST_CHECK_EQUAL(recovered_pub.to_string({}), pub.to_string({}));
-} FCL_LOG_AND_RETHROW();
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(test_k1_recyle) try {
    auto key = private_key::generate<ecc::private_key_shim>();
@@ -69,7 +73,8 @@ BOOST_AUTO_TEST_CASE(test_k1_recyle) try {
    std::cout << pub.to_string({}) << " -> " << recycled_pub.to_string({}) << std::endl;
 
    BOOST_CHECK_EQUAL(pub.to_string({}), recycled_pub.to_string({}));
-} FCL_LOG_AND_RETHROW();
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_CASE(test_r1_recyle) try {
    auto key = private_key::generate<r1::private_key_shim>();
@@ -80,7 +85,7 @@ BOOST_AUTO_TEST_CASE(test_r1_recyle) try {
    std::cout << pub.to_string({}) << " -> " << recycled_pub.to_string({}) << std::endl;
 
    BOOST_CHECK_EQUAL(pub.to_string({}), recycled_pub.to_string({}));
-} FCL_LOG_AND_RETHROW();
-
+}
+FCL_LOG_AND_RETHROW();
 
 BOOST_AUTO_TEST_SUITE_END()

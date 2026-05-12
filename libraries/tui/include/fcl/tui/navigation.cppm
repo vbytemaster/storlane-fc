@@ -10,7 +10,7 @@ import fcl.tui.types;
 export namespace fcl::tui {
 
 class navigation_stack {
-public:
+ public:
    navigation_stack();
    ~navigation_stack();
 
@@ -28,7 +28,7 @@ public:
    void select_next();
    void select_previous();
 
-private:
+ private:
    std::vector<navigation_model> stack_;
 };
 

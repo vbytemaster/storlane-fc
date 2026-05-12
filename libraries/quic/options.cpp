@@ -18,8 +18,8 @@ void validate_common_alpn(const std::string& alpn) {
 
 void validate_limits(const transport_limits& limits) {
    if (limits.max_connections == 0 || limits.max_streams_per_connection == 0 || limits.max_queued_bytes == 0 ||
-       limits.max_inbound_queued_bytes == 0 || limits.max_inbound_queued_packets == 0 ||
-       limits.max_frame_size == 0 || limits.max_frame_size > 0xffff'ffffULL) {
+       limits.max_inbound_queued_bytes == 0 || limits.max_inbound_queued_packets == 0 || limits.max_frame_size == 0 ||
+       limits.max_frame_size > 0xffff'ffffULL) {
       throw_quic_error(error_kind::invalid_options, "invalid QUIC transport limits");
    }
 }

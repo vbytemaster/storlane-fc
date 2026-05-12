@@ -16,11 +16,8 @@ using string_body = boost::beast::http::string_body;
 using request = boost::beast::http::request<string_body>;
 using response = boost::beast::http::response<string_body>;
 
-inline response make_text_response(
-   const request& source,
-   status result,
-   std::string body,
-   std::string content_type = "text/plain") {
+inline response make_text_response(const request& source, status result, std::string body,
+                                   std::string content_type = "text/plain") {
    auto reply = response{result, source.version()};
    reply.set(field::content_type, std::move(content_type));
    reply.body() = std::move(body);

@@ -14,7 +14,7 @@ export import fcl.quic.connection;
 export namespace fcl::quic {
 
 class listener {
-public:
+ public:
    listener(fcl::asio::runtime& runtime, endpoint bind_endpoint, server_options options);
    ~listener();
 
@@ -25,7 +25,7 @@ public:
    boost::asio::awaitable<connection> async_accept();
    void stop();
 
-private:
+ private:
    struct impl;
    std::unique_ptr<impl> impl_;
 };

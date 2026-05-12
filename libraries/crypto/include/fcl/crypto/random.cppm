@@ -15,9 +15,7 @@ void fill_random(std::span<std::uint8_t> out);
 
 [[nodiscard]] bytes random_bytes(std::size_t size);
 
-template<std::size_t Size>
-[[nodiscard]] std::array<std::uint8_t, Size> random_array()
-{
+template <std::size_t Size> [[nodiscard]] std::array<std::uint8_t, Size> random_array() {
    auto out = std::array<std::uint8_t, Size>{};
    fill_random(out);
    return out;

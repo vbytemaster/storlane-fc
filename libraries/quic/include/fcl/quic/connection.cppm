@@ -19,7 +19,7 @@ struct connection_access;
 } // namespace detail
 
 class connection {
-public:
+ public:
    connection();
    ~connection();
 
@@ -38,7 +38,7 @@ public:
    boost::asio::awaitable<void> async_close();
    void cancel();
 
-private:
+ private:
    friend struct detail::connection_access;
 
    explicit connection(detail::connection_handle handle);

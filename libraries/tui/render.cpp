@@ -16,23 +16,19 @@ namespace {
 
 std::string lower(std::string_view value) {
    auto out = std::string{value};
-   std::ranges::transform(out, out.begin(), [](unsigned char ch) {
-      return static_cast<char>(std::tolower(ch));
-   });
+   std::ranges::transform(out, out.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
    return out;
 }
 
 bool looks_sensitive(std::string_view value) {
    const auto text = lower(value);
    return text.find("private_key") != std::string::npos || text.find("private-key") != std::string::npos ||
-          text.find("private key") != std::string::npos ||
-          text.find("pvt_") != std::string::npos || text.find("token") != std::string::npos ||
-          text.find("workspace_secret") != std::string::npos || text.find("workspace-secret") != std::string::npos ||
-          text.find("workspace secret") != std::string::npos ||
+          text.find("private key") != std::string::npos || text.find("pvt_") != std::string::npos ||
+          text.find("token") != std::string::npos || text.find("workspace_secret") != std::string::npos ||
+          text.find("workspace-secret") != std::string::npos || text.find("workspace secret") != std::string::npos ||
           text.find("recovery") != std::string::npos || text.find("storage_handle") != std::string::npos ||
           text.find("storage-handle") != std::string::npos || text.find("passphrase") != std::string::npos ||
-          text.find("storage handle") != std::string::npos ||
-          text.find("secret") != std::string::npos;
+          text.find("storage handle") != std::string::npos || text.find("secret") != std::string::npos;
 }
 
 std::string join_cells(const std::vector<std::string>& cells, std::string_view separator) {
@@ -77,58 +73,58 @@ std::string redact_endpoint(std::string_view value) {
 
 std::string to_string(severity value) {
    switch (value) {
-      case severity::info:
-         return "info";
-      case severity::warning:
-         return "warning";
-      case severity::error:
-         return "error";
-      case severity::critical:
-         return "critical";
+   case severity::info:
+      return "info";
+   case severity::warning:
+      return "warning";
+   case severity::error:
+      return "error";
+   case severity::critical:
+      return "critical";
    }
    return "unknown";
 }
 
 std::string to_string(status value) {
    switch (value) {
-      case status::ok:
-         return "ok";
-      case status::degraded:
-         return "degraded";
-      case status::blocked:
-         return "blocked";
-      case status::offline:
-         return "offline";
-      case status::unknown:
-         return "unknown";
+   case status::ok:
+      return "ok";
+   case status::degraded:
+      return "degraded";
+   case status::blocked:
+      return "blocked";
+   case status::offline:
+      return "offline";
+   case status::unknown:
+      return "unknown";
    }
    return "unknown";
 }
 
 std::string to_string(action_state value) {
    switch (value) {
-      case action_state::enabled:
-         return "enabled";
-      case action_state::disabled:
-         return "disabled";
-      case action_state::dangerous:
-         return "dangerous";
-      case action_state::loading:
-         return "loading";
+   case action_state::enabled:
+      return "enabled";
+   case action_state::disabled:
+      return "disabled";
+   case action_state::dangerous:
+      return "dangerous";
+   case action_state::loading:
+      return "loading";
    }
    return "unknown";
 }
 
 std::string to_string(color_mode value) {
    switch (value) {
-      case color_mode::unknown:
-         return "unknown";
-      case color_mode::monochrome:
-         return "monochrome";
-      case color_mode::ansi_256:
-         return "ansi_256";
-      case color_mode::truecolor:
-         return "truecolor";
+   case color_mode::unknown:
+      return "unknown";
+   case color_mode::monochrome:
+      return "monochrome";
+   case color_mode::ansi_256:
+      return "ansi_256";
+   case color_mode::truecolor:
+      return "truecolor";
    }
    return "unknown";
 }
@@ -195,7 +191,8 @@ std::vector<std::string> render_form(const form_model& model) {
    lines.reserve(model.fields.size());
    for (const auto& field : model.fields) {
       auto line = field.label + ": ";
-      const auto hide = field.sensitive || looks_sensitive(field.name) || looks_sensitive(field.label) || looks_sensitive(field.value);
+      const auto hide = field.sensitive || looks_sensitive(field.name) || looks_sensitive(field.label) ||
+                        looks_sensitive(field.value);
       line += hide ? "<redacted>" : redact_text(field.value);
       if (!field.error.empty()) {
          line += " (error: " + field.error + ")";
@@ -239,7 +236,8 @@ std::vector<std::string> render_event_log(const event_log_model& model) {
 std::vector<std::string> render_shell(const shell_model& model) {
    auto lines = std::vector<std::string>{};
    lines.push_back(model.title);
-   lines.push_back("profile: " + model.profile + "  endpoint: " + redact_endpoint(model.endpoint) + "  actor: " + redact_text(model.actor));
+   lines.push_back("profile: " + model.profile + "  endpoint: " + redact_endpoint(model.endpoint) +
+                   "  actor: " + redact_text(model.actor));
    lines.push_back("");
    lines.push_back("menu:");
    for (auto index = std::size_t{0}; index < model.navigation.items.size(); ++index) {

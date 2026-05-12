@@ -7,18 +7,15 @@ export module fcl.crypto.k1_recover;
 
 // Snark - Wrapper for alt_bn128 add mul pair and modexp
 
-
-
 export namespace fcl {
-    using bytes = std::vector<char>;
+using bytes = std::vector<char>;
 
-    enum class k1_recover_error : int32_t {
-        init_error,
-        input_error,
-        invalid_signature,
-        recover_error,
-    };
+enum class k1_recover_error : int32_t {
+   init_error,
+   input_error,
+   invalid_signature,
+   recover_error,
+};
 
-    std::variant<k1_recover_error, bytes> k1_recover(const bytes& signature, const bytes& digest);
+std::variant<k1_recover_error, bytes> k1_recover(const bytes& signature, const bytes& digest);
 } // namespace fcl
-

@@ -47,7 +47,7 @@ struct event_bus_metrics {
 };
 
 class event_subscription {
-public:
+ public:
    event_subscription();
    ~event_subscription();
 
@@ -60,7 +60,7 @@ public:
    [[nodiscard]] std::optional<event_record> poll();
    void unsubscribe();
 
-private:
+ private:
    struct state;
    std::shared_ptr<state> state_;
 
@@ -70,7 +70,7 @@ private:
 };
 
 class event_bus {
-public:
+ public:
    explicit event_bus(event_bus_options options = {});
    ~event_bus();
 
@@ -83,7 +83,7 @@ public:
    [[nodiscard]] std::vector<event_record> recent_events() const;
    [[nodiscard]] event_bus_metrics metrics() const;
 
-private:
+ private:
    struct impl;
    std::shared_ptr<impl> impl_;
 };

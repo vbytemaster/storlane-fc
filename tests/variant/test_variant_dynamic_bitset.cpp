@@ -11,8 +11,7 @@ using std::string;
 
 BOOST_AUTO_TEST_SUITE(dynamic_bitset_test_suite)
 
-BOOST_AUTO_TEST_CASE(dynamic_bitset_test)
-{
+BOOST_AUTO_TEST_CASE(dynamic_bitset_test) {
    constexpr uint8_t bits = 0b0000000001010100;
    fcl::dynamic_bitset bs(16, bits); // 2 blocks of uint8_t
 

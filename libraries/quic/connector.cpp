@@ -62,26 +62,26 @@ namespace {
 
 [[nodiscard]] detail::engine_transport_limits map_limits(const transport_limits& limits) noexcept {
    return detail::engine_transport_limits{
-      .max_connections = limits.max_connections,
-      .max_streams_per_connection = limits.max_streams_per_connection,
-      .max_queued_bytes = limits.max_queued_bytes,
-      .max_inbound_queued_bytes = limits.max_inbound_queued_bytes,
-      .max_inbound_queued_packets = limits.max_inbound_queued_packets,
-      .max_frame_size = limits.max_frame_size,
+       .max_connections = limits.max_connections,
+       .max_streams_per_connection = limits.max_streams_per_connection,
+       .max_queued_bytes = limits.max_queued_bytes,
+       .max_inbound_queued_bytes = limits.max_inbound_queued_bytes,
+       .max_inbound_queued_packets = limits.max_inbound_queued_packets,
+       .max_frame_size = limits.max_frame_size,
    };
 }
 
 [[nodiscard]] detail::engine_security_options map_security(const security_options& security) {
    auto mapped = detail::engine_security_options{
-      .verify_peer = security.verify_peer,
-      .expected_sha256_fingerprint = security.expected_sha256_fingerprint,
-      .trusted_ca_pem = security.trusted_ca_pem,
+       .verify_peer = security.verify_peer,
+       .expected_sha256_fingerprint = security.expected_sha256_fingerprint,
+       .trusted_ca_pem = security.trusted_ca_pem,
    };
    if (security.verifier) {
       mapped.verifier = [verifier = security.verifier](const detail::engine_peer_certificate& certificate) {
          return verifier(peer_certificate{
-            .der = certificate.der,
-            .sha256_fingerprint = certificate.sha256_fingerprint,
+             .der = certificate.der,
+             .sha256_fingerprint = certificate.sha256_fingerprint,
          });
       };
    }
@@ -90,30 +90,27 @@ namespace {
 
 [[nodiscard]] detail::engine_client_options map_options(const client_options& options) {
    return detail::engine_client_options{
-      .alpn = options.alpn,
-      .connect_timeout = options.connect_timeout,
-      .handshake_timeout = options.handshake_timeout,
-      .idle_timeout = options.idle_timeout,
-      .limits = map_limits(options.limits),
-      .security = map_security(options.security),
-      .certificate_pem = options.certificate_pem,
-      .private_key_pem = options.private_key_pem,
+       .alpn = options.alpn,
+       .connect_timeout = options.connect_timeout,
+       .handshake_timeout = options.handshake_timeout,
+       .idle_timeout = options.idle_timeout,
+       .limits = map_limits(options.limits),
+       .security = map_security(options.security),
+       .certificate_pem = options.certificate_pem,
+       .private_key_pem = options.private_key_pem,
    };
 }
 
 } // namespace
 
 struct connector::impl {
-   explicit impl(fcl::asio::runtime& runtime_value)
-      : runtime(runtime_value)
-      , engine(runtime_value.context()) {}
+   explicit impl(fcl::asio::runtime& runtime_value) : runtime(runtime_value), engine(runtime_value.context()) {}
 
    fcl::asio::runtime& runtime;
    detail::engine_connector engine;
 };
 
-connector::connector(fcl::asio::runtime& runtime)
-   : impl_(std::make_unique<impl>(runtime)) {}
+connector::connector(fcl::asio::runtime& runtime) : impl_(std::make_unique<impl>(runtime)) {}
 
 connector::~connector() = default;
 
@@ -125,8 +122,7 @@ boost::asio::awaitable<connection> connector::async_connect(endpoint remote, cli
    }
    try {
       auto engine_connection = co_await impl_->engine.async_connect(
-         detail::engine_endpoint{.host = std::move(remote.host), .port = remote.port},
-         map_options(options));
+          detail::engine_endpoint{.host = std::move(remote.host), .port = remote.port}, map_options(options));
       co_return detail::connection_access::make(detail::connection_handle{.engine = std::move(engine_connection)});
    } catch (const detail::engine_error& error) {
       rethrow_engine_error(error);

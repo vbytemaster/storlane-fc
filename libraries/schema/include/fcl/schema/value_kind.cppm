@@ -18,11 +18,9 @@ enum class value_kind {
    string_list,
 };
 
-template <typename T>
-struct dependent_false : std::false_type {};
+template <typename T> struct dependent_false : std::false_type {};
 
-template <typename T>
-struct member_kind {
+template <typename T> struct member_kind {
    static constexpr value_kind value = [] {
       using clean_type = std::remove_cvref_t<T>;
       if constexpr (std::same_as<clean_type, bool>) {

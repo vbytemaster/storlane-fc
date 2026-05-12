@@ -41,17 +41,15 @@ BOOST_AUTO_TEST_CASE(task_scheduler_orders_by_numeric_priority_then_fifo) {
    };
 
    auto gate = scheduler.submit(scheduled_task{
-      .priority = priority{100},
-      .name = "gate",
-      .work =
-         [&] {
-            auto lock = std::unique_lock{gate_mutex};
-            gate_cv.wait(lock, [&] {
-               return release_gate;
-            });
-            lock.unlock();
-            record(0)();
-         },
+       .priority = priority{100},
+       .name = "gate",
+       .work =
+           [&] {
+              auto lock = std::unique_lock{gate_mutex};
+              gate_cv.wait(lock, [&] { return release_gate; });
+              lock.unlock();
+              record(0)();
+           },
    });
    auto low = scheduler.submit(scheduled_task{.priority = priority{10}, .name = "low", .work = record(4)});
    auto high_a = scheduler.submit(scheduled_task{.priority = priority{50}, .name = "high-a", .work = record(2)});
@@ -86,12 +84,10 @@ BOOST_AUTO_TEST_CASE(task_scheduler_runs_delayed_tasks_when_due) {
       };
    };
 
-   auto early = scheduler.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "early", .work = record(1)},
-      std::chrono::milliseconds{5});
-   auto late = scheduler.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "late", .work = record(2)},
-      std::chrono::milliseconds{25});
+   auto early = scheduler.submit_after(scheduled_task{.priority = priority{1}, .name = "early", .work = record(1)},
+                                       std::chrono::milliseconds{5});
+   auto late = scheduler.submit_after(scheduled_task{.priority = priority{1}, .name = "late", .work = record(2)},
+                                      std::chrono::milliseconds{25});
 
    wait_task(runtime, early);
    wait_task(runtime, late);
@@ -105,21 +101,19 @@ BOOST_AUTO_TEST_CASE(task_scheduler_cancels_pending_and_rejects_saturated_queue)
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 1}};
    auto scheduler = task_scheduler{runtime, task_scheduler_options{.max_active_tasks = 1, .max_pending_tasks = 2}};
 
-   auto canceled = scheduler.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "cancel", .work = [] {}},
-      std::chrono::seconds{1});
+   auto canceled = scheduler.submit_after(scheduled_task{.priority = priority{1}, .name = "cancel", .work = [] {}},
+                                          std::chrono::seconds{1});
    BOOST_CHECK(canceled.cancel());
    BOOST_CHECK(canceled.cancel_requested());
    BOOST_CHECK_THROW(wait_task(runtime, canceled), std::runtime_error);
 
    auto bounded_runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 1}};
-   auto bounded = task_scheduler{bounded_runtime, task_scheduler_options{.max_active_tasks = 1, .max_pending_tasks = 1}};
-   auto queued = bounded.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "queued", .work = [] {}},
-      std::chrono::seconds{1});
-   auto rejected = bounded.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "rejected", .work = [] {}},
-      std::chrono::seconds{1});
+   auto bounded =
+       task_scheduler{bounded_runtime, task_scheduler_options{.max_active_tasks = 1, .max_pending_tasks = 1}};
+   auto queued = bounded.submit_after(scheduled_task{.priority = priority{1}, .name = "queued", .work = [] {}},
+                                      std::chrono::seconds{1});
+   auto rejected = bounded.submit_after(scheduled_task{.priority = priority{1}, .name = "rejected", .work = [] {}},
+                                        std::chrono::seconds{1});
 
    BOOST_CHECK_THROW(wait_task(bounded_runtime, rejected), std::runtime_error);
    BOOST_CHECK_EQUAL(bounded.metrics().rejected, 1U);
@@ -130,9 +124,8 @@ BOOST_AUTO_TEST_CASE(task_scheduler_cancels_pending_and_rejects_saturated_queue)
 BOOST_AUTO_TEST_CASE(task_scheduler_shutdown_cancels_pending_work) {
    auto runtime = fcl::asio::runtime{fcl::asio::runtime_options{.worker_threads = 1}};
    auto scheduler = task_scheduler{runtime, task_scheduler_options{.max_active_tasks = 1, .max_pending_tasks = 4}};
-   auto delayed = scheduler.submit_after(
-      scheduled_task{.priority = priority{1}, .name = "delayed", .work = [] {}},
-      std::chrono::seconds{10});
+   auto delayed = scheduler.submit_after(scheduled_task{.priority = priority{1}, .name = "delayed", .work = [] {}},
+                                         std::chrono::seconds{10});
 
    scheduler.stop();
 

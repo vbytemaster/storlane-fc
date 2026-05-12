@@ -49,9 +49,7 @@ const char* to_string(error_kind kind) noexcept {
    return "unknown";
 }
 
-quic_error::quic_error(error_kind kind, std::string message)
-   : std::runtime_error(std::move(message))
-   , kind_(kind) {}
+quic_error::quic_error(error_kind kind, std::string message) : std::runtime_error(std::move(message)), kind_(kind) {}
 
 error_kind quic_error::kind() const noexcept {
    return kind_;

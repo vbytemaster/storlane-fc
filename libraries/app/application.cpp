@@ -29,12 +29,8 @@ std::string exception_message() {
    }
 }
 
-void publish_lifecycle_event(
-   plugin_context* context,
-   event_severity severity,
-   const plugin_id& id,
-   const char* transition,
-   std::string message = {}) {
+void publish_lifecycle_event(plugin_context* context, event_severity severity, const plugin_id& id,
+                             const char* transition, std::string message = {}) {
    if (message.empty()) {
       message = transition;
    }
@@ -43,10 +39,9 @@ void publish_lifecycle_event(
 
 } // namespace
 
-application_runtime::application_runtime(plugin_context& context, std::vector<std::unique_ptr<plugin>> plugins, diagnostics_store* diagnostics)
-   : context_{&context}
-   , diagnostics_{diagnostics}
-   , plugins_{std::move(plugins)} {}
+application_runtime::application_runtime(plugin_context& context, std::vector<std::unique_ptr<plugin>> plugins,
+                                         diagnostics_store* diagnostics)
+    : context_{&context}, diagnostics_{diagnostics}, plugins_{std::move(plugins)} {}
 
 application_runtime::~application_runtime() {
    request_stop();
@@ -179,12 +174,8 @@ boost::asio::awaitable<void> application_runtime::startup() {
    if (failure) {
       co_await shutdown();
       if (diagnostics_ && has_startup_failure) {
-         diagnostics_->set_plugin_state(
-            std::move(failed_plugin_id),
-            std::move(failed_plugin_version),
-            lifecycle_state::failed,
-            "startup",
-            std::move(failed_plugin_message));
+         diagnostics_->set_plugin_state(std::move(failed_plugin_id), std::move(failed_plugin_version),
+                                        lifecycle_state::failed, "startup", std::move(failed_plugin_message));
       }
       std::rethrow_exception(failure);
    }
@@ -209,7 +200,8 @@ boost::asio::awaitable<void> application_runtime::shutdown() {
          publish_lifecycle_event(context_, event_severity::info, id, "stopped");
       } catch (...) {
          if (diagnostics_) {
-            diagnostics_->set_plugin_state(value->id().value, value->version(), lifecycle_state::failed, "shutdown", exception_message());
+            diagnostics_->set_plugin_state(value->id().value, value->version(), lifecycle_state::failed, "shutdown",
+                                           exception_message());
          }
       }
    }

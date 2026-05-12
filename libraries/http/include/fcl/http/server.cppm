@@ -23,7 +23,7 @@ struct server_config {
 using server_handler = std::function<response(route_context&)>;
 
 class server {
-public:
+ public:
    server(fcl::asio::runtime& runtime, server_config config, server_handler handler);
    server(fcl::asio::runtime& runtime, server_config config, router router_value);
    ~server();
@@ -36,7 +36,7 @@ public:
 
    [[nodiscard]] std::uint16_t port() const;
 
-private:
+ private:
    struct impl;
 
    std::unique_ptr<impl> impl_;

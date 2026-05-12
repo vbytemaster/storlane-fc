@@ -18,10 +18,7 @@ struct frame_codec_options {
    std::uint32_t max_frame_size = 16 * 1024 * 1024;
 };
 
-enum class frame_decode_status {
-   complete,
-   need_more_data
-};
+enum class frame_decode_status { complete, need_more_data };
 
 struct frame_decode_result {
    frame_decode_status status = frame_decode_status::need_more_data;
@@ -29,11 +26,12 @@ struct frame_decode_result {
    std::size_t consumed = 0;
 };
 
-[[nodiscard]] std::vector<std::uint8_t> encode_frame(std::span<const std::uint8_t> payload, frame_codec_options options = {});
+[[nodiscard]] std::vector<std::uint8_t> encode_frame(std::span<const std::uint8_t> payload,
+                                                     frame_codec_options options = {});
 [[nodiscard]] frame_decode_result decode_frame(std::span<const std::uint8_t> bytes, frame_codec_options options = {});
 
 class framed_stream {
-public:
+ public:
    explicit framed_stream(stream stream_value, frame_codec_options options = {});
 
    framed_stream(framed_stream&&) noexcept;
@@ -49,7 +47,7 @@ public:
    boost::asio::awaitable<std::vector<std::uint8_t>> async_read_frame();
    boost::asio::awaitable<void> async_close();
 
-private:
+ private:
    stream stream_;
    frame_codec_options options_;
    std::vector<std::uint8_t> buffer_;
