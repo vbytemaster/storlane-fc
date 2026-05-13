@@ -16,6 +16,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 module fcl.app.runner;
@@ -44,15 +45,36 @@ boost::asio::awaitable<void> wait_for_os_signal(application_shell& app, const ru
    }
 }
 
-bool run_shutdown_to_completion(application_shell& app, std::chrono::milliseconds timeout) {
-   struct shutdown_state {
-      std::mutex mutex;
-      std::condition_variable ready;
-      bool done = false;
-      bool timed_out = false;
-      std::exception_ptr error;
-   };
+struct shutdown_state {
+   std::mutex mutex;
+   std::condition_variable ready;
+   bool done = false;
+   bool timed_out = false;
+   std::exception_ptr error;
+};
 
+struct shutdown_owner {
+   explicit shutdown_owner(std::unique_ptr<application_shell> input) : app{std::move(input)} {}
+
+   std::unique_ptr<application_shell> app;
+};
+
+void keep_owner_until_shutdown_finishes(std::shared_ptr<shutdown_state> state, std::shared_ptr<shutdown_owner> owner) {
+   if (!owner) {
+      return;
+   }
+   std::thread{[state = std::move(state), owner = std::move(owner)]() mutable {
+      auto lock = std::unique_lock{state->mutex};
+      state->ready.wait(lock, [&] {
+         return state->done;
+      });
+      lock.unlock();
+      owner.reset();
+   }}.detach();
+}
+
+bool run_shutdown_until_timeout(application_shell& app, std::chrono::milliseconds timeout,
+                                std::shared_ptr<shutdown_owner> owner = {}) {
    auto state = std::make_shared<shutdown_state>();
    auto timer = std::make_shared<boost::asio::steady_timer>(app.runtime().context());
    timer->expires_after(timeout);
@@ -63,10 +85,13 @@ bool run_shutdown_to_completion(application_shell& app, std::chrono::millisecond
          auto error = boost::system::error_code{};
          co_await timer->async_wait(boost::asio::redirect_error(boost::asio::use_awaitable, error));
          if (!error) {
-            const auto lock = std::scoped_lock{state->mutex};
-            if (!state->done) {
-               state->timed_out = true;
+            {
+               const auto lock = std::scoped_lock{state->mutex};
+               if (!state->done) {
+                  state->timed_out = true;
+               }
             }
+            state->ready.notify_all();
          }
       },
       boost::asio::detached);
@@ -93,10 +118,13 @@ bool run_shutdown_to_completion(application_shell& app, std::chrono::millisecond
 
    auto lock = std::unique_lock{state->mutex};
    state->ready.wait(lock, [&] {
-      return state->done;
+      return state->done || state->timed_out;
    });
 
    if (state->timed_out) {
+      if (!state->done) {
+         keep_owner_until_shutdown_finishes(state, std::move(owner));
+      }
       return false;
    }
    if (state->error) {
@@ -105,7 +133,8 @@ bool run_shutdown_to_completion(application_shell& app, std::chrono::millisecond
    return true;
 }
 
-void shutdown_with_timeout(application_shell& app, std::chrono::milliseconds timeout) {
+void shutdown_with_timeout(application_shell& app, std::chrono::milliseconds timeout,
+                           std::shared_ptr<shutdown_owner> owner = {}) {
    app.request_stop();
    if (app.state() == application_state::stopped) {
       return;
@@ -114,14 +143,13 @@ void shutdown_with_timeout(application_shell& app, std::chrono::milliseconds tim
       fcl::asio::blocking::run(app.runtime(), app.shutdown());
       return;
    }
-   if (!run_shutdown_to_completion(app, timeout)) {
+   if (!run_shutdown_until_timeout(app, timeout, std::move(owner))) {
       throw std::runtime_error{"application shutdown timed out"};
    }
 }
 
-} // namespace
-
-int run_application(application_shell& app, const fcl::config::document& document, run_options options) {
+int run_application_impl(application_shell& app, const fcl::config::document& document, run_options options,
+                         std::shared_ptr<shutdown_owner> owner) {
    auto exit_code = 0;
    auto failure = std::exception_ptr{};
 
@@ -140,7 +168,7 @@ int run_application(application_shell& app, const fcl::config::document& documen
    }
 
    try {
-      shutdown_with_timeout(app, options.shutdown_timeout);
+      shutdown_with_timeout(app, options.shutdown_timeout, std::move(owner));
    } catch (...) {
       if (!failure) {
          throw;
@@ -153,12 +181,19 @@ int run_application(application_shell& app, const fcl::config::document& documen
    return exit_code;
 }
 
+} // namespace
+
+int run_application(application_shell& app, const fcl::config::document& document, run_options options) {
+   return run_application_impl(app, document, std::move(options), {});
+}
+
 int run_application(std::unique_ptr<application_shell> app, const fcl::config::document& document,
                     run_options options) {
    if (!app) {
       throw std::invalid_argument{"application pointer must not be null"};
    }
-   return run_application(*app, document, std::move(options));
+   auto owner = std::make_shared<shutdown_owner>(std::move(app));
+   return run_application_impl(*owner->app, document, std::move(options), owner);
 }
 
 } // namespace fcl::app

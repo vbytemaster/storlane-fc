@@ -7,8 +7,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -42,6 +44,53 @@ class sample_port_impl final : public sample_port {
 
 struct lifecycle_log {
    std::vector<std::string> entries;
+};
+
+struct slow_shutdown_state {
+   mutable std::mutex mutex;
+   std::condition_variable ready;
+   bool shutdown_done = false;
+   bool destroyed = false;
+
+   void mark_shutdown_done() {
+      {
+         const auto lock = std::scoped_lock{mutex};
+         shutdown_done = true;
+      }
+      ready.notify_all();
+   }
+
+   void mark_destroyed() {
+      {
+         const auto lock = std::scoped_lock{mutex};
+         destroyed = true;
+      }
+      ready.notify_all();
+   }
+
+   bool shutdown_finished() const {
+      const auto lock = std::scoped_lock{mutex};
+      return shutdown_done;
+   }
+
+   bool shell_destroyed() const {
+      const auto lock = std::scoped_lock{mutex};
+      return destroyed;
+   }
+
+   bool wait_for_shutdown(std::chrono::milliseconds timeout) {
+      auto lock = std::unique_lock{mutex};
+      return ready.wait_for(lock, timeout, [&] {
+         return shutdown_done;
+      });
+   }
+
+   bool wait_for_destroyed(std::chrono::milliseconds timeout) {
+      auto lock = std::unique_lock{mutex};
+      return ready.wait_for(lock, timeout, [&] {
+         return destroyed;
+      });
+   }
 };
 
 struct shell_service_config {
@@ -331,7 +380,8 @@ class failing_initialize_plugin final : public fcl::app::plugin {
 
 class slow_shutdown_plugin final : public fcl::app::plugin {
  public:
-   slow_shutdown_plugin(lifecycle_log& log, bool& shutdown_done) : log_{&log}, shutdown_done_{&shutdown_done} {}
+   slow_shutdown_plugin(lifecycle_log& log, std::shared_ptr<slow_shutdown_state> state)
+       : log_{&log}, state_{std::move(state)} {}
 
    fcl::app::plugin_id id() const override {
       return fcl::app::plugin_id{.value = "slow"};
@@ -354,15 +404,15 @@ class slow_shutdown_plugin final : public fcl::app::plugin {
 
    boost::asio::awaitable<void> shutdown() override {
       auto timer = boost::asio::steady_timer{context_->scheduler().runtime_context().context()};
-      timer.expires_after(std::chrono::milliseconds{30});
+      timer.expires_after(std::chrono::milliseconds{100});
       co_await timer.async_wait(boost::asio::use_awaitable);
       log_->entries.push_back("shutdown:slow");
-      *shutdown_done_ = true;
+      state_->mark_shutdown_done();
    }
 
  private:
    lifecycle_log* log_ = nullptr;
-   bool* shutdown_done_ = nullptr;
+   std::shared_ptr<slow_shutdown_state> state_;
    fcl::app::plugin_context* context_ = nullptr;
 };
 
@@ -502,27 +552,31 @@ class shell_scheduler_cleanup_application final : public fcl::app::application_s
 
 class shell_slow_shutdown_application final : public fcl::app::application_shell {
  public:
-   shell_slow_shutdown_application(lifecycle_log& log, bool& shutdown_done)
+   shell_slow_shutdown_application(lifecycle_log& log, std::shared_ptr<slow_shutdown_state> state)
        : fcl::app::application_shell{fcl::app::application_shell_options{
             .name = "slow-shutdown",
             .runtime = {.worker_threads = 1, .thread_name = "slow-shutdown"},
          }},
          log_{&log},
-         shutdown_done_{&shutdown_done} {}
+         state_{std::move(state)} {}
+
+   ~shell_slow_shutdown_application() override {
+      state_->mark_destroyed();
+   }
 
  protected:
    void on_register_plugins(fcl::app::plugin_registry& registry) override {
       registry.register_plugin(fcl::app::plugin_descriptor{
          .id = fcl::app::plugin_id{.value = "slow"},
          .factory = [this] {
-            return std::make_unique<slow_shutdown_plugin>(*log_, *shutdown_done_);
+            return std::make_unique<slow_shutdown_plugin>(*log_, state_);
          },
       });
    }
 
  private:
    lifecycle_log* log_ = nullptr;
-   bool* shutdown_done_ = nullptr;
+   std::shared_ptr<slow_shutdown_state> state_;
 };
 
 class shell_selection_application final : public fcl::app::application_shell {
@@ -967,16 +1021,19 @@ BOOST_AUTO_TEST_CASE(run_application_executes_lifecycle_and_custom_stop_waiter) 
 
 BOOST_AUTO_TEST_CASE(run_application_unique_ptr_reports_shutdown_timeout_after_cleanup_finishes) {
    auto log = lifecycle_log{};
-   auto shutdown_done = false;
+   auto state = std::make_shared<slow_shutdown_state>();
 
-   auto app = std::make_unique<shell_slow_shutdown_application>(log, shutdown_done);
+   auto app = std::make_unique<shell_slow_shutdown_application>(log, state);
    auto options = fcl::app::run_options{};
    options.handle_sigint = false;
    options.handle_sigterm = false;
    options.shutdown_timeout = std::chrono::milliseconds{1};
 
    BOOST_CHECK_THROW(fcl::app::run_application(std::move(app), fcl::config::document{}, options), std::runtime_error);
-   BOOST_TEST(shutdown_done);
+   BOOST_TEST(!state->shutdown_finished());
+   BOOST_TEST(!state->shell_destroyed());
+   BOOST_TEST(state->wait_for_shutdown(std::chrono::seconds{1}));
+   BOOST_TEST(state->wait_for_destroyed(std::chrono::seconds{1}));
 
    const auto expected = std::vector<std::string>{
       "initialize:slow",
