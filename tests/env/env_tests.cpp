@@ -24,6 +24,20 @@ struct flat_config {
    std::string log_level;
 };
 
+struct env_name_collision_config {
+   std::string hyphen_name;
+   std::string underscore_name;
+};
+
+struct flat_http_collision_config {
+   std::uint16_t http_bind_port = 0;
+};
+
+struct alias_collision_config {
+   std::string token;
+   std::string auth_token;
+};
+
 [[nodiscard]] fcl::config::component_registry make_registry() {
    auto registry = fcl::config::component_registry{};
    registry.add(fcl::config::describe_component<http_config>("http"));
@@ -45,6 +59,9 @@ struct flat_config {
 
 BOOST_DESCRIBE_STRUCT(http_config, (), (bind_port, bind_host, tls_enabled, tags, token, legacy_token))
 BOOST_DESCRIBE_STRUCT(flat_config, (), (log_level))
+BOOST_DESCRIBE_STRUCT(env_name_collision_config, (), (hyphen_name, underscore_name))
+BOOST_DESCRIBE_STRUCT(flat_http_collision_config, (), (http_bind_port))
+BOOST_DESCRIBE_STRUCT(alias_collision_config, (), (token, auth_token))
 
 template <> struct fcl::schema::rules<http_config> {
    [[nodiscard]] static fcl::schema::object_schema<http_config> define() {
@@ -67,6 +84,32 @@ template <> struct fcl::schema::rules<flat_config> {
    [[nodiscard]] static fcl::schema::object_schema<flat_config> define() {
       auto schema = fcl::schema::object<flat_config>();
       schema.field<&flat_config::log_level>("log-level").default_value("info").description("Root log level.");
+      return schema;
+   }
+};
+
+template <> struct fcl::schema::rules<env_name_collision_config> {
+   [[nodiscard]] static fcl::schema::object_schema<env_name_collision_config> define() {
+      auto schema = fcl::schema::object<env_name_collision_config>();
+      static_cast<void>(schema.field<&env_name_collision_config::hyphen_name>("log-level"));
+      static_cast<void>(schema.field<&env_name_collision_config::underscore_name>("log_level"));
+      return schema;
+   }
+};
+
+template <> struct fcl::schema::rules<flat_http_collision_config> {
+   [[nodiscard]] static fcl::schema::object_schema<flat_http_collision_config> define() {
+      auto schema = fcl::schema::object<flat_http_collision_config>();
+      static_cast<void>(schema.field<&flat_http_collision_config::http_bind_port>("http-bind-port"));
+      return schema;
+   }
+};
+
+template <> struct fcl::schema::rules<alias_collision_config> {
+   [[nodiscard]] static fcl::schema::object_schema<alias_collision_config> define() {
+      auto schema = fcl::schema::object<alias_collision_config>();
+      schema.field<&alias_collision_config::token>("token").alias("auth-token");
+      static_cast<void>(schema.field<&alias_collision_config::auth_token>("auth_token"));
       return schema;
    }
 };
@@ -193,4 +236,62 @@ BOOST_AUTO_TEST_CASE(env_writes_dotenv_and_examples_with_secret_redaction) {
    BOOST_TEST(example.text.find("STORLANE_HTTP_TOKEN=") != std::string::npos);
    BOOST_TEST(example.text.find("<redacted>") == std::string::npos);
    BOOST_TEST(example.text.find("STORLANE_LOG_LEVEL=info") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(env_rejects_canonical_name_collisions_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<env_name_collision_config>(""));
+
+   const auto parsed = fcl::env::read_document(
+       "STORLANE_LOG_LEVEL=debug\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(!parsed.ok());
+
+   const auto* conflict = find_diagnostic(parsed.diagnostics, "env.name_conflict");
+   BOOST_REQUIRE(conflict != nullptr);
+   BOOST_TEST(conflict->message.find("STORLANE_LOG_LEVEL") != std::string::npos);
+   BOOST_TEST(conflict->message.find("log-level") != std::string::npos);
+   BOOST_TEST(conflict->message.find("log_level") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(env_rejects_flat_and_sectioned_name_collisions_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<http_config>("http"));
+   registry.add(fcl::config::describe_component<flat_http_collision_config>(""));
+
+   const auto parsed = fcl::env::read_document(
+       "STORLANE_HTTP_BIND_PORT=9090\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(!parsed.ok());
+
+   const auto* conflict = find_diagnostic(parsed.diagnostics, "env.name_conflict");
+   BOOST_REQUIRE(conflict != nullptr);
+   BOOST_TEST(conflict->message.find("STORLANE_HTTP_BIND_PORT") != std::string::npos);
+   BOOST_TEST(conflict->message.find("http.bind-port") != std::string::npos);
+   BOOST_TEST(conflict->message.find("http-bind-port") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(env_rejects_alias_name_collisions_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<alias_collision_config>("auth"));
+
+   const auto parsed = fcl::env::read_document(
+       "STORLANE_AUTH_AUTH_TOKEN=value\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(!parsed.ok());
+
+   const auto* conflict = find_diagnostic(parsed.diagnostics, "env.name_conflict");
+   BOOST_REQUIRE(conflict != nullptr);
+   BOOST_TEST(conflict->message.find("STORLANE_AUTH_AUTH_TOKEN") != std::string::npos);
+   BOOST_TEST(conflict->message.find("auth.token") != std::string::npos);
+   BOOST_TEST(conflict->message.find("auth.auth_token") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(env_write_example_rejects_name_collisions_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<env_name_collision_config>(""));
+
+   const auto example = fcl::env::write_example(registry, fcl::env::write_options{.prefix = "STORLANE"});
+   BOOST_TEST(!example.ok());
+
+   const auto* conflict = find_diagnostic(example.diagnostics, "env.name_conflict");
+   BOOST_REQUIRE(conflict != nullptr);
+   BOOST_TEST(conflict->message.find("STORLANE_LOG_LEVEL") != std::string::npos);
 }

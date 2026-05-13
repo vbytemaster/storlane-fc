@@ -45,6 +45,11 @@ struct selected_value {
    config::source_location location;
 };
 
+struct binding_build_result {
+   std::map<std::string, field_binding> bindings;
+   std::vector<schema::diagnostic> diagnostics;
+};
+
 [[nodiscard]] std::string trim(std::string_view input) {
    auto begin = std::size_t{0};
    while (begin < input.size() && std::isspace(static_cast<unsigned char>(input[begin])) != 0) {
@@ -143,9 +148,26 @@ struct selected_value {
    return case_sensitive ? std::move(name) : upper_ascii(std::move(name));
 }
 
-[[nodiscard]] std::map<std::string, field_binding> build_bindings(const config::component_registry& registry,
-                                                                  const read_options& options) {
-   auto result = std::map<std::string, field_binding>{};
+void add_name_conflict(std::vector<schema::diagnostic>& diagnostics, const field_binding& existing,
+                       const field_binding& candidate) {
+   diagnostics.push_back(make_diagnostic(
+       candidate.env_name, "env.name_conflict", schema::severity::error,
+       "environment variable " + candidate.env_name + " maps to both " + existing.path + " and " + candidate.path));
+}
+
+void add_binding(binding_build_result& result, field_binding candidate, bool case_sensitive) {
+   const auto key = lookup_key(candidate.env_name, case_sensitive);
+   const auto found = result.bindings.find(key);
+   if (found != result.bindings.end()) {
+      add_name_conflict(result.diagnostics, found->second, candidate);
+      return;
+   }
+   result.bindings.emplace(key, std::move(candidate));
+}
+
+[[nodiscard]] binding_build_result build_bindings(const config::component_registry& registry,
+                                                  const read_options& options) {
+   auto result = binding_build_result{};
    for (const auto& component : registry.components()) {
       for (const auto& field : component.fields) {
          const auto canonical_env = env_name_for(options.prefix, component.section, field.name);
@@ -157,7 +179,7 @@ struct selected_value {
              .field = field,
              .alias = false,
          };
-         result.emplace(lookup_key(canonical_env, options.case_sensitive), std::move(canonical));
+         add_binding(result, std::move(canonical), options.case_sensitive);
 
          if (!options.allow_aliases) {
             continue;
@@ -171,11 +193,42 @@ struct selected_value {
                 .field = field,
                 .alias = true,
             };
-            result.emplace(lookup_key(alias_env, options.case_sensitive), std::move(alias_binding));
+            add_binding(result, std::move(alias_binding), options.case_sensitive);
          }
       }
    }
    return result;
+}
+
+[[nodiscard]] std::vector<schema::diagnostic> validate_write_bindings(const config::component_registry& registry,
+                                                                      const write_options& options) {
+   auto seen = std::map<std::string, field_binding>{};
+   auto diagnostics = std::vector<schema::diagnostic>{};
+   for (const auto& component : registry.components()) {
+      for (const auto& field : component.fields) {
+         const auto canonical_env = env_name_for(options.prefix, component.section, field.name);
+         auto candidate = field_binding{
+             .path = path_for(component.section, field.name),
+             .env_name = canonical_env,
+             .canonical_env_name = canonical_env,
+             .field = field,
+             .alias = false,
+         };
+
+         const auto found = seen.find(canonical_env);
+         if (found != seen.end()) {
+            add_name_conflict(diagnostics, found->second, candidate);
+            continue;
+         }
+         seen.emplace(canonical_env, std::move(candidate));
+      }
+   }
+   return diagnostics;
+}
+
+[[nodiscard]] bool has_error(const std::vector<schema::diagnostic>& diagnostics) {
+   return std::ranges::any_of(
+       diagnostics, [](const schema::diagnostic& entry) { return entry.level == schema::severity::error; });
 }
 
 [[nodiscard]] config::value split_list_value(std::string_view input) {
@@ -576,7 +629,13 @@ read_result<config::document> read_variables(const std::vector<environment_varia
       return result;
    }
 
-   const auto bindings = build_bindings(registry, options);
+   auto binding_result = build_bindings(registry, options);
+   result.diagnostics.insert(result.diagnostics.end(), binding_result.diagnostics.begin(),
+                             binding_result.diagnostics.end());
+   if (has_error(result.diagnostics)) {
+      return result;
+   }
+
    auto selected = std::map<std::string, selected_value>{};
    const auto prefix = normalize_token(options.prefix);
 
@@ -585,8 +644,8 @@ read_result<config::document> read_variables(const std::vector<environment_varia
          continue;
       }
 
-      const auto found = bindings.find(lookup_key(variable.name, options.case_sensitive));
-      if (found == bindings.end()) {
+      const auto found = binding_result.bindings.find(lookup_key(variable.name, options.case_sensitive));
+      if (found == binding_result.bindings.end()) {
          if (options.unknown_variables != unknown_variable_policy::ignore) {
             result.diagnostics.push_back(make_diagnostic(
                 variable.name, "env.unknown",
@@ -683,6 +742,10 @@ write_result write_document(const config::document& document, const config::comp
           make_diagnostic({}, "env.prefix", schema::severity::error, "environment prefix must not be empty"));
       return output;
    }
+   output.diagnostics = validate_write_bindings(registry, options);
+   if (has_error(output.diagnostics)) {
+      return output;
+   }
 
    for (const auto& component : registry.components()) {
       for (const auto& field : component.fields) {
@@ -705,6 +768,10 @@ write_result write_example(const config::component_registry& registry, write_opt
    if (normalize_token(options.prefix).empty()) {
       output.diagnostics.push_back(
           make_diagnostic({}, "env.prefix", schema::severity::error, "environment prefix must not be empty"));
+      return output;
+   }
+   output.diagnostics = validate_write_bindings(registry, options);
+   if (has_error(output.diagnostics)) {
       return output;
    }
 
