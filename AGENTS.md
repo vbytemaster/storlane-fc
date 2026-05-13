@@ -109,7 +109,36 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 
 ## App And Plugins
 
-- The app layer is optional, not a mandatory framework.
+- `fcl_app` provides an opinionated `application_shell` for production
+  programs. Prefer it for new services instead of copying runtime, scheduler,
+  ports, signals, events, diagnostics, plugin context and application runtime
+  members into every product application.
+- `application_shell` owns lifecycle order: collect app and plugin config,
+  merge defaults with input document, configure app hook, configure plugins,
+  install app ports, initialize plugins, startup plugins, request stop and
+  reverse shutdown.
+- Plugin enable/disable is application-shell-owned config under
+  `plugins.<plugin-id>.enabled`. Products must not manually distribute plugin
+  selection from their own monolithic config object as the primary path.
+- Foreground daemon lifecycle should use `fcl.app.runner` before inventing
+  local signal loops. Service-mode adapters such as systemd, launchd or Windows
+  services are a separate future layer, not part of the app shell contract.
+- Public lifecycle methods on `application_shell` are not extension points.
+  Derived applications implement only hooks named without app tautology:
+  `on_describe_config`, `on_configure`, `on_register_plugins`,
+  `on_install_ports` and optionally `on_run_foreground`.
+- Do not add hook names like `describe_app_config`, `configure_app`, `app_*`
+  or another parallel application lifecycle vocabulary. The context already
+  identifies the code as application-level.
+- `application_builder` is allowed only as convenience syntax that builds an
+  `application_shell`. It must not define a second lifecycle model, own
+  independent lifecycle state or bypass shell config/plugin ordering.
+- Do not add builder sugar such as separate `threads(...)` convenience methods
+  without a concrete consumer win. Runtime options already carry worker count
+  and thread name together.
+- Use `application_builder` for simple composition and tests. Use a derived
+  `application_shell` when the application has substantial state or complex
+  composition.
 - Ports define contracts.
 - Plugins orchestrate behavior.
 - Adapters connect concrete backends and external systems.

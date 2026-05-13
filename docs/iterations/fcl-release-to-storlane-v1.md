@@ -52,7 +52,7 @@ convenience target, not a dependency minimization strategy.
 
 `examples/app/application_lifecycle.cpp` demonstrates:
 
-- `application_base`;
+- `application_shell`;
 - plugin registry;
 - typed ports;
 - config descriptor and `component_view`;

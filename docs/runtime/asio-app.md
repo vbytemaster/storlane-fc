@@ -21,7 +21,7 @@ are bounded, shutdown is deterministic and diagnostics are part of the contract.
 program shell
   -> fcl_program_options / fcl_yaml / fcl_json
   -> fcl_config::document
-  -> fcl_app::application_runtime
+  -> fcl_app::application_shell
   -> plugins configured through component_view
   -> fcl_asio runtime / task_scheduler for async work
 ```
@@ -29,6 +29,9 @@ program shell
 `fcl_app` consumes config documents and component views. It does not parse
 files, environment or command lines. That split keeps application core testable:
 tests can feed a `config::document` directly without building argv/YAML fixtures.
+`application_runtime` remains a lower-level escape hatch, while
+`application_shell` is the preferred production owner of runtime, scheduler,
+ports, events, signals, diagnostics, plugin registry and plugin context.
 
 ## Runtime Ownership
 
@@ -44,13 +47,15 @@ tests can feed a `config::document` directly without building argv/YAML fixtures
 
 The lifecycle order is fixed:
 
-1. plugins are constructed;
-2. config descriptors are collected;
-3. config document is applied through `configure(component_view)`;
-4. plugins initialize in dependency order;
-5. plugins start;
-6. `request_stop()` is issued synchronously;
-7. plugins shut down in reverse order.
+1. app and plugin config descriptors are collected;
+2. schema defaults are merged with the input config document;
+3. app hook receives `configure_context`;
+4. plugins receive `configure(component_view)`;
+5. app hook installs ports;
+6. plugins initialize in dependency order;
+7. plugins start;
+8. `request_stop()` is issued synchronously;
+9. plugins shut down in reverse order.
 
 All heavy lifecycle methods return `boost::asio::awaitable<void>`. `request_stop`
 is intentionally synchronous/noexcept: it signals intent, it does not perform
@@ -59,31 +64,53 @@ cleanup.
 ## Integration Example
 
 ```cpp
-auto runtime = fcl::asio::runtime{{.worker_threads = 2}};
-auto scheduler = fcl::asio::task_scheduler{runtime, {.max_active_tasks = 4}};
-auto ports = fcl::app::port_registry{};
-auto signals = fcl::app::signal_bus{};
-auto events = fcl::app::event_bus{};
-auto diagnostics = fcl::app::diagnostics_store{};
-auto context = fcl::app::plugin_context{scheduler, ports, signals, events, &diagnostics};
+class service_application final : public fcl::app::application_shell {
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(make_http_plugin_descriptor());
+   }
 
-auto app = fcl::app::application_runtime{context, std::move(plugins), &diagnostics};
+   void on_describe_config(fcl::config::component_registry& registry) const override {
+      registry.add(fcl::config::describe_component<service_config>("service"));
+   }
+};
+
+auto app = service_application{};
 auto registry = app.describe_config();
 auto cli = fcl::program_options::parse(argc, argv, registry);
 
-co_await app.configure(cli.document);
-co_await app.initialize();
+app.configure(cli.document);
 co_await app.startup();
+app.request_stop();
+co_await app.shutdown();
 ```
 
-The program shell owns CLI/YAML/JSON adapters. The `application_runtime` sees
-only an already-merged `config::document`.
+The program shell owns CLI/YAML/JSON adapters. `application_shell` sees only an
+already-merged `config::document` and controls plugin lifecycle ordering.
+
+For smaller applications and tests, `application_builder` creates an
+`application_shell` without introducing another lifecycle model:
+
+```cpp
+auto builder = fcl::app::application_builder{};
+builder.name("service")
+   .config<service_config>("service", [&](const service_config& config) {
+      configure_service(config);
+   })
+   .plugin(make_http_plugin_descriptor());
+
+std::unique_ptr<fcl::app::application_shell> app = std::move(builder).build();
+app->configure(document);
+co_await app->startup();
+```
 
 Buildable examples:
 
 - [examples/app/application_lifecycle.cpp](../../examples/app/application_lifecycle.cpp)
-  shows `application_base`, typed ports, config, lifecycle signals,
+  shows `application_shell`, typed ports, config, lifecycle signals,
   diagnostics and POSIX signal bridge.
+- [examples/app/application_builder.cpp](../../examples/app/application_builder.cpp)
+  shows builder syntax that still returns an `application_shell`.
 - [examples/app/exception_logging.cpp](../../examples/app/exception_logging.cpp)
   shows exception capture routed into `fcl_log` without making
   `fcl_exception` depend on logging.

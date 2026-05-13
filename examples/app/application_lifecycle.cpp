@@ -3,22 +3,54 @@
 #include <boost/asio/detached.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/use_awaitable.hpp>
+#include <boost/describe.hpp>
 
 #include <csignal>
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
 
 import fcl.app;
 import fcl.asio.blocking;
-import fcl.asio.runtime;
-import fcl.asio.task_scheduler;
 import fcl.config;
 import fcl.schema;
+
+namespace {
+
+struct service_config {
+   std::uint16_t workers = 2;
+   bool foreground = true;
+};
+
+BOOST_DESCRIBE_STRUCT(service_config, (), (workers, foreground))
+
+struct operator_config {
+   std::uint16_t bind_port = 9090;
+};
+
+BOOST_DESCRIBE_STRUCT(operator_config, (), (bind_port))
+
+} // namespace
+
+template <>
+struct fcl::schema::rules<service_config> {
+   static fcl::schema::object_schema<service_config> define() {
+      auto schema = fcl::schema::object<service_config>();
+      schema.field<&service_config::workers>("workers").default_value(2).range(1, 64);
+      schema.field<&service_config::foreground>("foreground").default_value(true);
+      return schema;
+   }
+};
+
+template <>
+struct fcl::schema::rules<operator_config> {
+   static fcl::schema::object_schema<operator_config> define() {
+      auto schema = fcl::schema::object<operator_config>();
+      schema.field<&operator_config::bind_port>("bind-port").default_value(9090).range(1, 65'535);
+      return schema;
+   }
+};
 
 namespace {
 
@@ -46,28 +78,20 @@ class operator_plugin final : public fcl::app::plugin {
    }
 
    std::optional<fcl::config::component_descriptor> describe_config() const override {
-      return fcl::config::component_descriptor{
-          .section = "operator",
-          .fields = {fcl::config::field_descriptor{
-              .name = "workers",
-              .kind = fcl::schema::value_kind::unsigned_integer,
-              .required = true,
-              .description = "Number of worker slots owned by the program.",
-          }},
-      };
+      return fcl::config::describe_component<operator_config>("operator");
    }
 
    boost::asio::awaitable<void> configure(fcl::config::component_view view) override {
-      workers_ = view.get_or<std::uint16_t>("workers", 1);
+      bind_port_ = view.get_or<std::uint16_t>("bind-port", 9090);
       co_return;
    }
 
    boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
-      if (workers_ == 0) {
-         throw std::runtime_error{"operator workers must be greater than zero"};
-      }
       context.ports().install<status_port>(std::make_shared<status_port_impl>());
-      context.events().publish(fcl::app::event_severity::info, "operator.initialize", "status port installed");
+      context.events().publish(
+         fcl::app::event_severity::info,
+         "operator.initialize",
+         "status port installed on " + std::to_string(bind_port_));
       co_return;
    }
 
@@ -81,90 +105,79 @@ class operator_plugin final : public fcl::app::plugin {
 
    boost::asio::awaitable<void> shutdown() override {
       stopping_ = true;
+      co_return;
+   }
+
+ private:
+   std::uint16_t bind_port_ = 0;
+   bool stopping_ = false;
+};
+
+class service_application final : public fcl::app::application_shell {
+ public:
+   service_application()
+       : fcl::app::application_shell{fcl::app::application_shell_options{
+            .name = "example-app",
+            .runtime = {.worker_threads = 1, .thread_name = "example-app"},
+         }} {}
+
+   std::uint16_t workers() const noexcept {
+      return workers_;
+   }
+
+ protected:
+   void on_describe_config(fcl::config::component_registry& registry) const override {
+      registry.add(fcl::config::describe_component<service_config>("service"));
+   }
+
+   boost::asio::awaitable<void> on_configure(fcl::app::configure_context& context) override {
+      workers_ = context.view("service").get_or<std::uint16_t>("workers", 2);
+      co_return;
+   }
+
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "operator"},
+         .factory = [] {
+            return std::make_unique<operator_plugin>();
+         },
+      });
+   }
+
+   boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+      context.events().publish(
+         fcl::app::event_severity::info,
+         "service.configure",
+         "worker slots: " + std::to_string(workers_));
       co_return;
    }
 
  private:
    std::uint16_t workers_ = 0;
-   bool stopping_ = false;
 };
 
-class service_app final : public fcl::app::application_base {
- public:
-   service_app()
-       : scheduler_{runtime_}, context_{scheduler_, ports_, signals_, events_, &diagnostics_},
-         app_{context_, make_plugins(), &diagnostics_} {
-      signals_.plugin_started.connect([this](const fcl::app::plugin_signal& signal) {
-         events_.publish(fcl::app::event_severity::info, "plugin.started", signal.plugin);
-      });
-   }
-
-   boost::asio::awaitable<void> initialize() override {
-      auto document = fcl::config::document{};
-      document.set("operator.workers", 2U);
-      co_await app_.configure(document);
-      co_await app_.initialize();
-   }
-
-   boost::asio::awaitable<void> startup() override {
-      co_await app_.startup();
-   }
-
-   void request_stop() noexcept override {
-      app_.request_stop();
-      scheduler_.stop();
-   }
-
-   boost::asio::awaitable<void> shutdown() override {
-      co_await app_.shutdown();
-   }
-
-   fcl::asio::runtime& runtime() noexcept {
-      return runtime_;
-   }
-
-   const fcl::app::diagnostics_store& diagnostics() const noexcept {
-      return diagnostics_;
-   }
-
-   fcl::app::event_bus& events() noexcept {
-      return events_;
-   }
-
- private:
-   static std::vector<std::unique_ptr<fcl::app::plugin>> make_plugins() {
-      auto plugins = std::vector<std::unique_ptr<fcl::app::plugin>>{};
-      plugins.push_back(std::make_unique<operator_plugin>());
-      return plugins;
-   }
-
-   fcl::asio::runtime runtime_{{.worker_threads = 1, .thread_name = "example-app"}};
-   fcl::asio::task_scheduler scheduler_{runtime_};
-   fcl::app::port_registry ports_;
-   fcl::app::signal_bus signals_;
-   fcl::app::event_bus events_;
-   fcl::app::diagnostics_store diagnostics_;
-   fcl::app::plugin_context context_;
-   fcl::app::application_runtime app_;
-};
-
-void install_signal_bridge(service_app& app) {
+void install_signal_bridge(service_application& app) {
    auto signals = std::make_shared<boost::asio::signal_set>(app.runtime().context(), SIGINT, SIGTERM);
    boost::asio::co_spawn(
-       app.runtime().context(),
-       [&app, signals]() -> boost::asio::awaitable<void> {
-          co_await signals->async_wait(boost::asio::use_awaitable);
-          app.request_stop();
-       },
-       boost::asio::detached);
+      app.runtime().context(),
+      [&app, signals]() -> boost::asio::awaitable<void> {
+         co_await signals->async_wait(boost::asio::use_awaitable);
+         app.request_stop();
+      },
+      boost::asio::detached);
 }
 
 } // namespace
 
 int main() {
-   auto app = service_app{};
+   auto app = service_application{};
    install_signal_bridge(app);
-   fcl::asio::blocking::run(app.runtime(), app.initialize());
+
+   auto document = fcl::config::document{};
+   document.set("service.workers", 4U);
+   document.set("operator.bind-port", 7777U);
+
+   app.configure(document);
    fcl::asio::blocking::run(app.runtime(), app.startup());
    app.request_stop();
    fcl::asio::blocking::run(app.runtime(), app.shutdown());

@@ -23,6 +23,8 @@ struct field_descriptor {
    std::vector<std::string> aliases;
    schema::value_kind kind = schema::value_kind::string;
    bool required = false;
+   bool has_default = false;
+   value default_value;
    bool secret = false;
    bool deprecated = false;
    std::string deprecated_message;
@@ -104,5 +106,6 @@ class component_view {
 };
 
 [[nodiscard]] document redact(document input, const component_registry& registry);
+[[nodiscard]] document defaults_for(const component_registry& registry);
 
 } // namespace fcl::config
