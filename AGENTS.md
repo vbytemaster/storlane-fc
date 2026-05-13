@@ -124,6 +124,12 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Do not add hook names like `describe_app_config`, `configure_app`, `app_*`
   or another parallel application lifecycle vocabulary. The context already
   identifies the code as application-level.
+- `application_builder` is allowed only as convenience syntax that builds an
+  `application_shell`. It must not define a second lifecycle model, own
+  independent lifecycle state or bypass shell config/plugin ordering.
+- Use `application_builder` for simple composition and tests. Use a derived
+  `application_shell` when the application has substantial state or complex
+  composition.
 - Ports define contracts.
 - Plugins orchestrate behavior.
 - Adapters connect concrete backends and external systems.

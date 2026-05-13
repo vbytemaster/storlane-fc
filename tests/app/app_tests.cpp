@@ -630,3 +630,127 @@ BOOST_AUTO_TEST_CASE(application_shell_rolls_back_started_plugins_on_startup_fai
    BOOST_TEST(static_cast<int>(snapshot.state) == static_cast<int>(fcl::app::lifecycle_state::failed));
    BOOST_TEST(snapshot.last_error == "startup failed");
 }
+
+BOOST_AUTO_TEST_CASE(application_builder_creates_shell_and_applies_config_handlers) {
+   auto log = lifecycle_log{};
+   auto workers = std::uint16_t{0};
+   auto async_config_called = false;
+
+   auto builder = fcl::app::application_builder{};
+   builder.name("builder-test")
+      .runtime(fcl::asio::runtime_options{.worker_threads = 1, .thread_name = "builder-test"})
+      .config<shell_service_config>("service", [&](fcl::app::configure_context& context, const shell_service_config& config)
+                                    -> boost::asio::awaitable<void> {
+         workers = config.workers;
+         log.entries.push_back("typed.configure:" + std::to_string(workers));
+         BOOST_TEST(context.view("service").get_or<std::uint16_t>("workers", 0) == 6U);
+         co_return;
+      })
+      .configure([&](fcl::app::configure_context&) {
+         async_config_called = true;
+         log.entries.push_back("configure.extra");
+      })
+      .install_ports([&](fcl::app::application_context& context) {
+         context.ports().install<sample_port>(std::make_shared<sample_port_impl>(workers));
+         log.entries.push_back("install_ports:" + std::to_string(context.ports().size()));
+      })
+      .run_foreground([&](fcl::app::application_shell& shell) {
+         log.entries.push_back("run");
+         return shell.ports().get<sample_port>()->value();
+      });
+
+   auto app = std::move(builder).build();
+   const auto registry = app->describe_config();
+   BOOST_REQUIRE_EQUAL(registry.components().size(), 1U);
+   BOOST_TEST(registry.components()[0].section == "service");
+
+   auto document = fcl::config::document{};
+   document.set("service.workers", 6);
+   app->configure(document);
+   fcl::asio::blocking::run(app->runtime(), app->startup());
+
+   BOOST_TEST(async_config_called);
+   BOOST_TEST(workers == 6U);
+   BOOST_TEST(app->ports().get<sample_port>()->value() == 6);
+   BOOST_TEST(app->run() == 6);
+
+   fcl::asio::blocking::run(app->runtime(), app->shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "typed.configure:6",
+      "configure.extra",
+      "install_ports:1",
+      "run",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_builder_collects_plugin_config_and_preserves_dependency_order) {
+   auto log = lifecycle_log{};
+   auto builder = fcl::app::application_builder{};
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "http"},
+      .factory = [&log] {
+         return std::make_unique<shell_config_plugin>(log);
+      },
+   });
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "store"},
+      .factory = [&log] {
+         return std::make_unique<shell_dependency_plugin>("store", log);
+      },
+   });
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "api"},
+      .dependencies = {fcl::app::plugin_id{.value = "store"}},
+      .factory = [&log] {
+         return std::make_unique<shell_dependency_plugin>("api", log);
+      },
+   });
+
+   auto app = std::move(builder).build();
+   const auto registry = app->describe_config();
+   BOOST_REQUIRE_EQUAL(registry.components().size(), 1U);
+   BOOST_TEST(registry.components()[0].section == "http");
+
+   app->configure(fcl::config::document{});
+   fcl::asio::blocking::run(app->runtime(), app->startup());
+   fcl::asio::blocking::run(app->runtime(), app->shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "plugin.configure:9000",
+      "plugin.initialize:9000",
+      "initialize:store",
+      "initialize:api",
+      "plugin.startup",
+      "startup:store",
+      "startup:api",
+      "shutdown:api",
+      "shutdown:store",
+      "plugin.shutdown",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_builder_rejects_invalid_typed_config_before_side_effects) {
+   auto configured = false;
+   auto ports_installed = false;
+
+   auto builder = fcl::app::application_builder{};
+   builder.config<shell_service_config>("service", [&](const shell_service_config&) {
+      configured = true;
+   });
+   builder.install_ports([&](fcl::app::application_context& context) {
+      ports_installed = true;
+      context.ports().install<sample_port>(std::make_shared<sample_port_impl>(1));
+   });
+
+   auto app = std::move(builder).build();
+   auto document = fcl::config::document{};
+   document.set("service.workers", 99);
+
+   BOOST_CHECK_THROW(app->configure(document), std::invalid_argument);
+   BOOST_TEST(!configured);
+   BOOST_TEST(!ports_installed);
+   BOOST_TEST(!app->ports().try_get<sample_port>());
+}

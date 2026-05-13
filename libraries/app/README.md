@@ -30,6 +30,8 @@ reimplement plugin order manually.
 ## Public Modules
 
 - `fcl.app.application_shell` — production app shell and hook contexts.
+- `fcl.app.application_builder` — convenience builder that creates an
+  `application_shell`.
 - `fcl.app.application` — lower-level `application_base` and
   `application_runtime`.
 - `fcl.app.plugin`, `fcl.app.plugin_context`, `fcl.app.plugin_registry`.
@@ -189,6 +191,49 @@ class service_application final : public fcl::app::application_shell {
 };
 ```
 
+## Application Builder Example
+
+`application_builder` is convenience syntax for simple daemons and tests. It
+does not define a second lifecycle: `build()` returns
+`std::unique_ptr<fcl::app::application_shell>`, and the generated shell still
+owns config merge, plugin lifecycle, rollback, ports, events and diagnostics.
+
+```cpp
+import fcl.app;
+import fcl.asio.runtime;
+
+auto workers = std::uint16_t{0};
+auto builder = fcl::app::application_builder{};
+
+builder.name("service")
+   .runtime(fcl::asio::runtime_options{.worker_threads = 2, .thread_name = "service"})
+   .config<service_config>("service", [&](const service_config& config) {
+      workers = config.workers;
+   })
+   .install_ports([&](fcl::app::application_context& context) {
+      context.events().publish(
+         fcl::app::event_severity::info,
+         "service.configure",
+         "worker slots: " + std::to_string(workers));
+   })
+   .plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "http"},
+      .factory = [] {
+         return std::make_unique<http_plugin>();
+      },
+   })
+   .run_foreground([](fcl::app::application_shell& app) {
+      app.request_stop();
+      return 0;
+   });
+
+std::unique_ptr<fcl::app::application_shell> app = std::move(builder).build();
+```
+
+Use the subclass form when the application has substantial state or non-trivial
+composition. Use the builder form when callbacks are enough and you want to keep
+the program entrypoint compact.
+
 ## Running The Shell
 
 Config can come from YAML, JSON, environment adapters or CLI. The shell only
@@ -318,7 +363,8 @@ handling.
 
 `application_runtime` remains available when a host framework already owns
 runtime, ports, signals and diagnostics. That is an escape hatch, not the normal
-daemon pattern. Prefer `application_shell` for new services.
+daemon pattern. Prefer `application_shell` or `application_builder` for new
+services.
 
 ```cpp
 auto runtime = fcl::app::application_runtime{context, std::move(plugins), &diagnostics};
@@ -327,12 +373,11 @@ co_await runtime.startup();
 co_await runtime.shutdown();
 ```
 
-A builder-style API may be added later as convenience syntax, but it must wrap
-the same shell contract instead of becoming a second lifecycle model.
-
 ## Typical Mistakes
 
 - Do not copy shell-owned members into every product application.
+- Do not use `application_builder` to define another lifecycle; it only creates
+  a shell.
 - Do not manually instantiate plugins in product startup code when
   `application_shell` can own the registry.
 - Do not configure plugin options from `build_plugins()`; plugin config belongs
@@ -350,4 +395,5 @@ startup rollback, reverse shutdown and diagnostics.
 Buildable examples:
 
 - [`examples/app/application_lifecycle.cpp`](../../examples/app/application_lifecycle.cpp)
+- [`examples/app/application_builder.cpp`](../../examples/app/application_builder.cpp)
 - [`examples/app/exception_logging.cpp`](../../examples/app/exception_logging.cpp)

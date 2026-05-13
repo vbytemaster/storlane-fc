@@ -9,6 +9,7 @@ add_library(
    plugin.cpp
    plugin_registry.cpp
    application_shell.cpp
+   application_builder.cpp
 )
 fcl_target_modules(fcl_app app)
 

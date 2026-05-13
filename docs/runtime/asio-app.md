@@ -88,11 +88,29 @@ co_await app.shutdown();
 The program shell owns CLI/YAML/JSON adapters. `application_shell` sees only an
 already-merged `config::document` and controls plugin lifecycle ordering.
 
+For smaller applications and tests, `application_builder` creates an
+`application_shell` without introducing another lifecycle model:
+
+```cpp
+auto builder = fcl::app::application_builder{};
+builder.name("service")
+   .config<service_config>("service", [&](const service_config& config) {
+      configure_service(config);
+   })
+   .plugin(make_http_plugin_descriptor());
+
+std::unique_ptr<fcl::app::application_shell> app = std::move(builder).build();
+app->configure(document);
+co_await app->startup();
+```
+
 Buildable examples:
 
 - [examples/app/application_lifecycle.cpp](../../examples/app/application_lifecycle.cpp)
   shows `application_shell`, typed ports, config, lifecycle signals,
   diagnostics and POSIX signal bridge.
+- [examples/app/application_builder.cpp](../../examples/app/application_builder.cpp)
+  shows builder syntax that still returns an `application_shell`.
 - [examples/app/exception_logging.cpp](../../examples/app/exception_logging.cpp)
   shows exception capture routed into `fcl_log` without making
   `fcl_exception` depend on logging.
