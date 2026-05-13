@@ -74,6 +74,7 @@ void keep_owner_until_shutdown_finishes(std::shared_ptr<shutdown_state> state, s
 }
 
 bool run_shutdown_until_timeout(application_shell& app, std::chrono::milliseconds timeout,
+                                bool allow_async_shutdown_tail,
                                 std::shared_ptr<shutdown_owner> owner = {}) {
    auto state = std::make_shared<shutdown_state>();
    auto timer = std::make_shared<boost::asio::steady_timer>(app.runtime().context());
@@ -123,18 +124,31 @@ bool run_shutdown_until_timeout(application_shell& app, std::chrono::millisecond
 
    if (state->timed_out) {
       if (!state->done) {
-         keep_owner_until_shutdown_finishes(state, std::move(owner));
+         if (allow_async_shutdown_tail) {
+            keep_owner_until_shutdown_finishes(state, std::move(owner));
+            return false;
+         }
+         state->ready.wait(lock, [&] {
+            return state->done;
+         });
+      }
+      auto error = state->error;
+      lock.unlock();
+      if (error) {
+         std::rethrow_exception(error);
       }
       return false;
    }
-   if (state->error) {
-      std::rethrow_exception(state->error);
+   auto error = state->error;
+   lock.unlock();
+   if (error) {
+      std::rethrow_exception(error);
    }
    return true;
 }
 
 void shutdown_with_timeout(application_shell& app, std::chrono::milliseconds timeout,
-                           std::shared_ptr<shutdown_owner> owner = {}) {
+                           bool allow_async_shutdown_tail, std::shared_ptr<shutdown_owner> owner = {}) {
    app.request_stop();
    if (app.state() == application_state::stopped) {
       return;
@@ -143,7 +157,7 @@ void shutdown_with_timeout(application_shell& app, std::chrono::milliseconds tim
       fcl::asio::blocking::run(app.runtime(), app.shutdown());
       return;
    }
-   if (!run_shutdown_until_timeout(app, timeout, std::move(owner))) {
+   if (!run_shutdown_until_timeout(app, timeout, allow_async_shutdown_tail, std::move(owner))) {
       throw std::runtime_error{"application shutdown timed out"};
    }
 }
@@ -168,7 +182,8 @@ int run_application_impl(application_shell& app, const fcl::config::document& do
    }
 
    try {
-      shutdown_with_timeout(app, options.shutdown_timeout, std::move(owner));
+      const auto allow_async_shutdown_tail = static_cast<bool>(owner);
+      shutdown_with_timeout(app, options.shutdown_timeout, allow_async_shutdown_tail, std::move(owner));
    } catch (...) {
       if (!failure) {
          throw;

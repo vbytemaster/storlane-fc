@@ -1043,6 +1043,40 @@ BOOST_AUTO_TEST_CASE(run_application_unique_ptr_reports_shutdown_timeout_after_c
    BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
 }
 
+BOOST_AUTO_TEST_CASE(run_application_reference_reports_timeout_only_after_shutdown_finishes) {
+   auto log = lifecycle_log{};
+   auto state = std::make_shared<slow_shutdown_state>();
+
+   auto app = shell_slow_shutdown_application{log, state};
+   auto options = fcl::app::run_options{};
+   options.handle_sigint = false;
+   options.handle_sigterm = false;
+   options.shutdown_timeout = std::chrono::milliseconds{1};
+
+   auto threw_timeout = false;
+   try {
+      static_cast<void>(fcl::app::run_application(app, fcl::config::document{}, options));
+   } catch (const std::runtime_error&) {
+      threw_timeout = true;
+   }
+
+   const auto finished_before_return = state->shutdown_finished();
+   if (!finished_before_return) {
+      static_cast<void>(state->wait_for_shutdown(std::chrono::seconds{1}));
+   }
+
+   BOOST_TEST(threw_timeout);
+   BOOST_TEST(finished_before_return);
+   BOOST_TEST(!state->shell_destroyed());
+
+   const auto expected = std::vector<std::string>{
+      "initialize:slow",
+      "startup:slow",
+      "shutdown:slow",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
 BOOST_AUTO_TEST_CASE(application_builder_creates_shell_and_applies_config_handlers) {
    auto log = lifecycle_log{};
    auto workers = std::uint16_t{0};
