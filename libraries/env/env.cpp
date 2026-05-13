@@ -284,6 +284,14 @@ template <typename Parser>
    return parsed;
 }
 
+[[nodiscard]] bool has_negative_sign_after_ascii_space(std::string_view input) {
+   auto index = std::size_t{0};
+   while (index < input.size() && std::isspace(static_cast<unsigned char>(input[index])) != 0) {
+      ++index;
+   }
+   return index < input.size() && input[index] == '-';
+}
+
 [[nodiscard]] config::value convert_value(schema::value_kind kind, std::string_view input) {
    switch (kind) {
    case schema::value_kind::boolean: {
@@ -300,6 +308,9 @@ template <typename Parser>
                           },
                           "expected signed integer value");
    case schema::value_kind::unsigned_integer:
+      if (has_negative_sign_after_ascii_space(input)) {
+         throw std::invalid_argument{"expected unsigned integer value"};
+      }
       return parse_number(input,
                           [](const std::string& text, std::size_t* position) {
                              return static_cast<std::uint64_t>(std::stoull(text, position));

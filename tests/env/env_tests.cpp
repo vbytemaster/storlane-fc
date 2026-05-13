@@ -46,6 +46,10 @@ struct same_path_alias_config {
    std::string token;
 };
 
+struct unsigned_counter_config {
+   std::uint64_t count = 0;
+};
+
 #if defined(_WIN32)
 class scoped_environment_variable {
  public:
@@ -99,6 +103,7 @@ BOOST_DESCRIBE_STRUCT(env_name_collision_config, (), (hyphen_name, underscore_na
 BOOST_DESCRIBE_STRUCT(flat_http_collision_config, (), (http_bind_port))
 BOOST_DESCRIBE_STRUCT(alias_collision_config, (), (token, auth_token))
 BOOST_DESCRIBE_STRUCT(same_path_alias_config, (), (token))
+BOOST_DESCRIBE_STRUCT(unsigned_counter_config, (), (count))
 
 template <> struct fcl::schema::rules<http_config> {
    [[nodiscard]] static fcl::schema::object_schema<http_config> define() {
@@ -155,6 +160,14 @@ template <> struct fcl::schema::rules<same_path_alias_config> {
    [[nodiscard]] static fcl::schema::object_schema<same_path_alias_config> define() {
       auto schema = fcl::schema::object<same_path_alias_config>();
       schema.field<&same_path_alias_config::token>("token").alias("auth-token").alias("auth_token");
+      return schema;
+   }
+};
+
+template <> struct fcl::schema::rules<unsigned_counter_config> {
+   [[nodiscard]] static fcl::schema::object_schema<unsigned_counter_config> define() {
+      auto schema = fcl::schema::object<unsigned_counter_config>();
+      static_cast<void>(schema.field<&unsigned_counter_config::count>("count"));
       return schema;
    }
 };
@@ -270,6 +283,26 @@ BOOST_AUTO_TEST_CASE(env_typed_helpers_decode_schema_and_validate_ranges) {
        "STORLANE_HTTP_BIND_PORT=0\n", "http", fcl::env::read_options{.prefix = "STORLANE"});
    BOOST_TEST(!parsed.ok());
    BOOST_REQUIRE(find_diagnostic(parsed.diagnostics, "schema.range") != nullptr);
+}
+
+BOOST_AUTO_TEST_CASE(env_rejects_negative_text_for_unsigned_fields_before_decode) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<unsigned_counter_config>("counter"));
+
+   const auto rejected = fcl::env::read_document(
+       "STORLANE_COUNTER_COUNT=-1\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(!rejected.ok());
+   const auto* convert = find_diagnostic(rejected.diagnostics, "env.convert");
+   BOOST_REQUIRE(convert != nullptr);
+   BOOST_TEST(convert->path == "counter.count");
+   BOOST_TEST(convert->message.find("expected unsigned integer value") != std::string::npos);
+
+   const auto accepted = fcl::env::read_document(
+       "STORLANE_COUNTER_COUNT=42\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(accepted.ok());
+   const auto decoded = fcl::config::decode<unsigned_counter_config>(accepted.value, "counter");
+   BOOST_TEST(decoded.ok());
+   BOOST_TEST(decoded.value.count == 42U);
 }
 
 BOOST_AUTO_TEST_CASE(env_writes_dotenv_and_examples_with_secret_redaction) {
