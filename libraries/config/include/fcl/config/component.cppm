@@ -27,6 +27,8 @@ struct field_descriptor {
    bool deprecated = false;
    std::string deprecated_message;
    std::string description;
+   bool has_default = false;
+   value default_value;
 };
 
 struct component_descriptor {

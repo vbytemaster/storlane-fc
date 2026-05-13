@@ -8,7 +8,7 @@ order, start, stop and shut down with rollback-friendly diagnostics.
 
 - A program has multiple infrastructure plugins with ordered startup/shutdown.
 - Plugins must publish config descriptors without knowing whether values came
-  from YAML, JSON, environment or CLI.
+  from source adapters such as YAML, JSON or CLI.
 - The application wants lifecycle diagnostics and an event bus.
 
 ## When Not To Use

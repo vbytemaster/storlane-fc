@@ -20,6 +20,10 @@ import fcl.schema;
 
 export namespace fcl::config {
 
+[[nodiscard]] bool parse_bool_text(std::string text, bool& output);
+[[nodiscard]] std::any value_to_any(const value& input, schema::value_kind kind);
+[[nodiscard]] value any_to_value(schema::value_kind kind, const std::any& input);
+
 template <typename T> [[nodiscard]] component_descriptor describe_component(std::string section) {
    auto descriptor = component_descriptor{.section = std::move(section)};
    const auto rules = schema::rules<T>::define();
@@ -33,6 +37,8 @@ template <typename T> [[nodiscard]] component_descriptor describe_component(std:
           .deprecated = field.deprecated,
           .deprecated_message = field.deprecated_message,
           .description = field.description,
+          .has_default = field.has_default,
+          .default_value = field.has_default ? any_to_value(field.kind, field.default_value) : value{},
       });
    }
    return descriptor;
@@ -55,10 +61,6 @@ template <typename T> struct decode_result {
       return diagnostics.ok();
    }
 };
-
-[[nodiscard]] bool parse_bool_text(std::string text, bool& output);
-[[nodiscard]] std::any value_to_any(const value& input, schema::value_kind kind);
-[[nodiscard]] value any_to_value(schema::value_kind kind, const std::any& input);
 
 template <typename T> [[nodiscard]] decode_result<T> decode(const document& source, std::string_view section = {}) {
    auto result = decode_result<T>{};
