@@ -5,7 +5,9 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cwchar>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -159,6 +161,9 @@ void add_binding(binding_build_result& result, field_binding candidate, bool cas
    const auto key = lookup_key(candidate.env_name, case_sensitive);
    const auto found = result.bindings.find(key);
    if (found != result.bindings.end()) {
+      if (found->second.path == candidate.path) {
+         return;
+      }
       add_name_conflict(result.diagnostics, found->second, candidate);
       return;
    }
@@ -470,6 +475,30 @@ void select_value(read_result<config::document>& result, std::map<std::string, s
 [[nodiscard]] std::vector<environment_variable> process_environment() {
    auto result = std::vector<environment_variable>{};
 #if defined(_WIN32)
+   auto wide_to_utf8 = [](std::wstring_view input) -> std::optional<std::string> {
+      if (input.empty()) {
+         return std::string{};
+      }
+      if (input.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+         return std::nullopt;
+      }
+
+      const auto input_size = static_cast<int>(input.size());
+      const auto required =
+          WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, input.data(), input_size, nullptr, 0, nullptr, nullptr);
+      if (required <= 0) {
+         return std::nullopt;
+      }
+
+      auto output = std::string(static_cast<std::size_t>(required), '\0');
+      const auto written = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, input.data(), input_size, output.data(),
+                                               required, nullptr, nullptr);
+      if (written != required) {
+         return std::nullopt;
+      }
+      return output;
+   };
+
    const auto block = GetEnvironmentStringsW();
    if (!block) {
       return result;
@@ -480,9 +509,12 @@ void select_value(read_result<config::document>& result, std::map<std::string, s
       if (equals == std::wstring::npos || equals == 0) {
          continue;
       }
-      auto name = std::string{wide.begin(), wide.begin() + static_cast<std::ptrdiff_t>(equals)};
-      auto value = std::string{wide.begin() + static_cast<std::ptrdiff_t>(equals + 1), wide.end()};
-      result.push_back({.name = std::move(name), .value = std::move(value), .location = {.source = "process env"}});
+      auto name = wide_to_utf8(std::wstring_view{wide}.substr(0, equals));
+      auto value = wide_to_utf8(std::wstring_view{wide}.substr(equals + 1));
+      if (!name || !value) {
+         continue;
+      }
+      result.push_back({.name = std::move(*name), .value = std::move(*value), .location = {.source = "process env"}});
    }
    FreeEnvironmentStringsW(block);
 #else

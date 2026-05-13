@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 import fcl.config;
 import fcl.env;
 import fcl.schema;
@@ -38,6 +42,38 @@ struct alias_collision_config {
    std::string auth_token;
 };
 
+struct same_path_alias_config {
+   std::string token;
+};
+
+#if defined(_WIN32)
+class scoped_environment_variable {
+ public:
+   scoped_environment_variable(const wchar_t* name, const wchar_t* value) : name_{name} {
+      auto size = GetEnvironmentVariableW(name_.c_str(), nullptr, 0);
+      if (size != 0) {
+         old_value_.resize(size);
+         GetEnvironmentVariableW(name_.c_str(), old_value_.data(), size);
+         old_value_.resize(size - 1);
+         had_old_value_ = true;
+      }
+      SetEnvironmentVariableW(name_.c_str(), value);
+   }
+
+   ~scoped_environment_variable() {
+      SetEnvironmentVariableW(name_.c_str(), had_old_value_ ? old_value_.c_str() : nullptr);
+   }
+
+   scoped_environment_variable(const scoped_environment_variable&) = delete;
+   scoped_environment_variable& operator=(const scoped_environment_variable&) = delete;
+
+ private:
+   std::wstring name_;
+   std::wstring old_value_;
+   bool had_old_value_ = false;
+};
+#endif
+
 [[nodiscard]] fcl::config::component_registry make_registry() {
    auto registry = fcl::config::component_registry{};
    registry.add(fcl::config::describe_component<http_config>("http"));
@@ -62,6 +98,7 @@ BOOST_DESCRIBE_STRUCT(flat_config, (), (log_level))
 BOOST_DESCRIBE_STRUCT(env_name_collision_config, (), (hyphen_name, underscore_name))
 BOOST_DESCRIBE_STRUCT(flat_http_collision_config, (), (http_bind_port))
 BOOST_DESCRIBE_STRUCT(alias_collision_config, (), (token, auth_token))
+BOOST_DESCRIBE_STRUCT(same_path_alias_config, (), (token))
 
 template <> struct fcl::schema::rules<http_config> {
    [[nodiscard]] static fcl::schema::object_schema<http_config> define() {
@@ -110,6 +147,14 @@ template <> struct fcl::schema::rules<alias_collision_config> {
       auto schema = fcl::schema::object<alias_collision_config>();
       schema.field<&alias_collision_config::token>("token").alias("auth-token");
       static_cast<void>(schema.field<&alias_collision_config::auth_token>("auth_token"));
+      return schema;
+   }
+};
+
+template <> struct fcl::schema::rules<same_path_alias_config> {
+   [[nodiscard]] static fcl::schema::object_schema<same_path_alias_config> define() {
+      auto schema = fcl::schema::object<same_path_alias_config>();
+      schema.field<&same_path_alias_config::token>("token").alias("auth-token").alias("auth_token");
       return schema;
    }
 };
@@ -327,3 +372,49 @@ BOOST_AUTO_TEST_CASE(env_write_document_rejects_alias_name_collisions_after_norm
    BOOST_TEST(conflict->message.find("auth.token") != std::string::npos);
    BOOST_TEST(conflict->message.find("auth.auth_token") != std::string::npos);
 }
+
+BOOST_AUTO_TEST_CASE(env_allows_same_path_alias_duplicates_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<same_path_alias_config>("auth"));
+
+   const auto parsed = fcl::env::read_document(
+       "STORLANE_AUTH_AUTH_TOKEN=token-value\n", registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(parsed.ok());
+   BOOST_TEST(find_diagnostic(parsed.diagnostics, "env.name_conflict") == nullptr);
+
+   const auto decoded = fcl::config::decode<same_path_alias_config>(parsed.value, "auth");
+   BOOST_TEST(decoded.ok());
+   BOOST_TEST(decoded.value.token == "token-value");
+}
+
+BOOST_AUTO_TEST_CASE(env_write_paths_allow_same_path_alias_duplicates_after_normalization) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<same_path_alias_config>("auth"));
+
+   auto document = fcl::config::document{};
+   document.set("auth.token", "token-value");
+
+   const auto example = fcl::env::write_example(registry, fcl::env::write_options{.prefix = "STORLANE"});
+   BOOST_TEST(example.ok());
+   BOOST_TEST(find_diagnostic(example.diagnostics, "env.name_conflict") == nullptr);
+
+   const auto written = fcl::env::write_document(document, registry, fcl::env::write_options{.prefix = "STORLANE"});
+   BOOST_TEST(written.ok());
+   BOOST_TEST(find_diagnostic(written.diagnostics, "env.name_conflict") == nullptr);
+   BOOST_TEST(written.text.find("STORLANE_AUTH_TOKEN=token-value") != std::string::npos);
+}
+
+#if defined(_WIN32)
+BOOST_AUTO_TEST_CASE(env_windows_process_snapshot_preserves_utf16_values_as_utf8) {
+   auto registry = fcl::config::component_registry{};
+   registry.add(fcl::config::describe_component<same_path_alias_config>("win"));
+   const auto variable = scoped_environment_variable{L"STORLANE_WIN_TOKEN", L"\x043A\x043B\x044E\x0447-\x2713"};
+
+   const auto parsed = fcl::env::read_process_document(registry, fcl::env::read_options{.prefix = "STORLANE"});
+   BOOST_TEST(parsed.ok());
+
+   const auto decoded = fcl::config::decode<same_path_alias_config>(parsed.value, "win");
+   BOOST_TEST(decoded.ok());
+   BOOST_TEST(decoded.value.token == "\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87-\xE2\x9C\x93");
+}
+#endif
