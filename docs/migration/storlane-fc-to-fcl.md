@@ -161,14 +161,18 @@ is the preferred modern symmetric API; CBC/CFB remain compatibility surfaces.
 
 ## App And Runtime
 
-Program shells should move to `application_base` plus `application_runtime`:
+Program shells should move to `application_shell`. It owns the common runtime
+members, plugin registry, config collection and lifecycle order:
 
 ```cpp
 import fcl.app;
 import fcl.asio.blocking;
 
-auto app = service_app{make_plugins()};
-fcl::asio::blocking::run(app.runtime(), app.initialize());
+auto app = service_application{};
+auto registry = app.describe_config();
+auto document = load_config(registry);
+
+app.configure(document);
 fcl::asio::blocking::run(app.runtime(), app.startup());
 app.request_stop();
 fcl::asio::blocking::run(app.runtime(), app.shutdown());
@@ -176,6 +180,8 @@ fcl::asio::blocking::run(app.runtime(), app.shutdown());
 
 Plugins describe config through `describe_config()` and receive
 `config::component_view`; they do not parse CLI/YAML directly.
+Use lower-level `application_runtime` only when an existing host framework
+already owns runtime, ports, events, signals and diagnostics.
 
 ## Review Checklist
 

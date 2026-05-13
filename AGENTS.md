@@ -109,7 +109,21 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 
 ## App And Plugins
 
-- The app layer is optional, not a mandatory framework.
+- `fcl_app` provides an opinionated `application_shell` for production
+  programs. Prefer it for new services instead of copying runtime, scheduler,
+  ports, signals, events, diagnostics, plugin context and application runtime
+  members into every product application.
+- `application_shell` owns lifecycle order: collect app and plugin config,
+  merge defaults with input document, configure app hook, configure plugins,
+  install app ports, initialize plugins, startup plugins, request stop and
+  reverse shutdown.
+- Public lifecycle methods on `application_shell` are not extension points.
+  Derived applications implement only hooks named without app tautology:
+  `on_describe_config`, `on_configure`, `on_register_plugins`,
+  `on_install_ports` and optionally `on_run_foreground`.
+- Do not add hook names like `describe_app_config`, `configure_app`, `app_*`
+  or another parallel application lifecycle vocabulary. The context already
+  identifies the code as application-level.
 - Ports define contracts.
 - Plugins orchestrate behavior.
 - Adapters connect concrete backends and external systems.
