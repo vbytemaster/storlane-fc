@@ -8,3 +8,4 @@ export import fcl.app.signals;
 export import fcl.app.plugin_context;
 export import fcl.app.plugin;
 export import fcl.app.plugin_registry;
+export import fcl.app.application_shell;

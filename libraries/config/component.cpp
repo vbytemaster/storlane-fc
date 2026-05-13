@@ -65,4 +65,22 @@ document redact(document input, const component_registry& registry) {
    return input;
 }
 
+document defaults_for(const component_registry& registry) {
+   auto output = document{};
+   for (const auto& component : registry.components()) {
+      for (const auto& field : component.fields) {
+         if (!field.has_default) {
+            continue;
+         }
+         auto path = component.section;
+         if (!path.empty()) {
+            path += ".";
+         }
+         path += field.name;
+         output.set(std::move(path), field.default_value);
+      }
+   }
+   return output;
+}
+
 } // namespace fcl::config
