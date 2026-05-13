@@ -97,6 +97,7 @@ bytes.resize(fcl::raw::pack_size(command));
 auto stream = fcl::datastream<char*>{bytes.data(), bytes.size()};
 fcl::raw::pack(stream, command);
 
+auto private_key = fcl::crypto::private_key::generate();
 auto digest = fcl::sha256::hash(bytes.data(), bytes.size());
 auto signature = private_key.sign(digest);
 ```
