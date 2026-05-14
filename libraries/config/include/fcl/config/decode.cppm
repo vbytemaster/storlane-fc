@@ -33,12 +33,12 @@ template <typename T> [[nodiscard]] component_descriptor describe_component(std:
           .aliases = field.aliases,
           .kind = field.kind,
           .required = field.required,
+          .has_default = field.has_default,
+          .default_value = field.has_default ? any_to_value(field.kind, field.default_value) : value{},
           .secret = field.secret,
           .deprecated = field.deprecated,
           .deprecated_message = field.deprecated_message,
           .description = field.description,
-          .has_default = field.has_default,
-          .default_value = field.has_default ? any_to_value(field.kind, field.default_value) : value{},
       });
    }
    return descriptor;

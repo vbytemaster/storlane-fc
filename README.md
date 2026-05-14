@@ -104,7 +104,7 @@ if (!parsed.ok()) {
 | [crypto](libraries/crypto/README.md) | `fcl_crypto` | Hashes, encodings, keys, signatures, OpenSSL 3.0+ crypto. | OpenSSL::Crypto, GMP, secp256k1, BLS. |
 | [log](libraries/log/README.md) | `fcl_log` | Logging core, messages, console/appender boundary. | `fcl_variant`, Boost.DLL privately. |
 | [asio](libraries/asio/README.md) | `fcl_asio` | Asio runtime, blocking boundary, priority scheduler. | Boost.Asio, threads. |
-| [app](libraries/app/README.md) | `fcl_app` | Async application lifecycle, plugins, ports, diagnostics. | `fcl_asio`, `fcl_config`. |
+| [app](libraries/app/README.md) | `fcl_app` | Opinionated application shell, plugins, ports, config and diagnostics. | `fcl_asio`, `fcl_config`. |
 | [http](libraries/http/README.md) | `fcl_http` | HTTP target/base URL, router, middleware, client/server. | Boost.Beast/URL/Asio, OpenSSL. |
 | [websocket](libraries/websocket/README.md) | `fcl_websocket` | WebSocket connection/client primitives. | Boost.Beast/Asio, OpenSSL. |
 | [quic](libraries/quic/README.md) | `fcl_quic` | QUIC endpoint, listener, connector, framed streams. | ngtcp2, OpenSSL 3.0+, Boost.Asio. |

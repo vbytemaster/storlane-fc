@@ -1,27 +1,44 @@
 # fcl_app
 
-`fcl_app` provides an async application lifecycle and plugin coordination layer.
-Plugins describe config, receive a typed config view, initialize in dependency
-order, start, stop and shut down with rollback-friendly diagnostics.
+`fcl_app` is the opinionated application shell for FCL services. It owns the
+runtime objects that every daemon tends to duplicate by hand: `runtime`,
+`task_scheduler`, typed ports, signal bus, event bus, diagnostics, plugin
+registry, plugin context and lifecycle runtime.
+
+The preferred production entrypoint is `fcl::app::application_shell`. Lower
+level pieces such as `application_runtime` remain available for tests and custom
+frameworks, but product programs should not copy the same shell members and
+reimplement plugin order manually.
 
 ## When To Use
 
-- A program has multiple infrastructure plugins with ordered startup/shutdown.
+- A program has plugins with config, dependency order and async lifecycle.
+- A daemon needs one place to collect app config and plugin config.
+- You want deterministic startup, rollback, reverse shutdown and diagnostics.
+- You want typed ports between plugins without coupling them through globals.
 - Plugins must publish config descriptors without knowing whether values came
-  from source adapters such as YAML, JSON or CLI.
-- The application wants lifecycle diagnostics and an event bus.
+  from source adapters such as YAML, JSON, env or CLI.
 
 ## When Not To Use
 
-- Do not use it as dependency injection for arbitrary business objects.
-- Do not parse `argv` here; CLI parsing belongs to `fcl_program_options`.
-- Do not put product-specific authority/security checks in the app core.
+- Do not use `fcl_app` as a generic dependency injection container.
+- Do not parse `argv`, YAML or JSON inside plugins. Use `fcl_program_options`,
+  `fcl_yaml` or `fcl_json` before `application_shell::configure(...)`.
+- Do not put security authority into UI/events/diagnostics. They are
+  observability surfaces, not permission boundaries.
+- Do not invent `describe_app_config` or `configure_app` hook names. The shell
+  context already says this is application code.
 
 ## Public Modules
 
+- `fcl.app.application_shell` — production app shell and hook contexts.
+- `fcl.app.application_builder` — convenience builder that creates an
+  `application_shell`.
+- `fcl.app.runner` — foreground lifecycle runner with signal policy.
+- `fcl.app.application` — lower-level `application_base` and
+  `application_runtime`.
 - `fcl.app.plugin`, `fcl.app.plugin_context`, `fcl.app.plugin_registry`.
-- `fcl.app.application` — `application_base`, `application_runtime`.
-- `fcl.app.ports` — typed port registry.
+- `fcl.app.ports` — typed service port registry.
 - `fcl.app.events`, `fcl.app.diagnostics`, `fcl.app.signals`.
 - `fcl.app` — aggregate import.
 
@@ -29,80 +46,45 @@ Target: `fcl_app`.
 
 Dependencies: `fcl_asio`, `fcl_config`, Boost headers.
 
-## Examples
+## Production Shape
 
-### Wrap Runtime In `application_base`
-
-Program binaries usually expose their own application class. It owns the FCL
-runtime objects, delegates plugin lifecycle to `application_runtime`, and keeps
-`request_stop()` synchronous so signal handlers can call it safely.
+`application_shell` makes lifecycle methods non-overridable:
 
 ```cpp
-#include <boost/asio/awaitable.hpp>
-
-#include <memory>
-#include <vector>
-
-import fcl.app;
-import fcl.asio.runtime;
-import fcl.asio.task_scheduler;
-
-class service_app final : public fcl::app::application_base {
-public:
-   explicit service_app(std::vector<std::unique_ptr<fcl::app::plugin>> plugins)
-      : scheduler_{runtime_}
-      , context_{scheduler_, ports_, signals_, events_, &diagnostics_}
-      , app_{context_, std::move(plugins), &diagnostics_} {}
-
-   boost::asio::awaitable<void> initialize() override {
-      co_await app_.initialize();
-      co_return;
-   }
-
-   boost::asio::awaitable<void> startup() override {
-      co_await app_.startup();
-      co_return;
-   }
-
-   void request_stop() noexcept override {
-      app_.request_stop();
-      scheduler_.stop();
-   }
-
-   boost::asio::awaitable<void> shutdown() override {
-      co_await app_.shutdown();
-      co_return;
-   }
-
-   fcl::asio::runtime& runtime() noexcept { return runtime_; }
-
-private:
-   fcl::asio::runtime runtime_{{.worker_threads = 2, .thread_name = "service"}};
-   fcl::asio::task_scheduler scheduler_;
-   fcl::app::port_registry ports_;
-   fcl::app::signal_bus signals_;
-   fcl::app::event_bus events_;
-   fcl::app::diagnostics_store diagnostics_;
-   fcl::app::plugin_context context_;
-   fcl::app::application_runtime app_;
-};
+app.describe_config();
+app.configure(document);
+co_await app.initialize();
+co_await app.startup();
+app.request_stop();
+co_await app.shutdown();
 ```
 
-The class above is intentionally thin. Product code may add CLI/YAML loading,
-PID files or platform service integration around it, but the plugin lifecycle
-stays in `application_runtime`. Notice that `request_stop()` does not stop the
-runtime directly: async `shutdown()` still needs the runtime to run cleanup.
+Derived applications only implement hooks:
 
-Buildable versions of this pattern live in
-[`examples/app/application_lifecycle.cpp`](../../examples/app/application_lifecycle.cpp)
-and [`examples/app/exception_logging.cpp`](../../examples/app/exception_logging.cpp).
+- `on_describe_config(registry&)`
+- `on_configure(configure_context&)`
+- `on_register_plugins(plugin_registry&)`
+- `on_install_ports(application_context&)`
+- `on_run_foreground()`
 
-### Publish Config For A Plugin
+This is deliberately strict. The product controls composition, but FCL controls
+the order: collect config, configure app and plugins, install ports, initialize
+plugins, startup plugins, request stop, shutdown in reverse order.
+
+## App And Plugin Config
+
+A plugin owns its own config. The application owns only app-level config. The
+shell merges defaults from every registered descriptor with the input document
+before calling `on_configure(...)` and plugin `configure(...)`.
 
 ```cpp
 #include <boost/describe.hpp>
 
 #include <cstdint>
+
+import fcl.app;
+import fcl.config;
+import fcl.schema;
 
 struct http_config {
    std::uint16_t bind_port = 8080;
@@ -111,29 +93,19 @@ struct http_config {
 
 BOOST_DESCRIBE_STRUCT(http_config, (), (bind_port, tls_enabled))
 
-import fcl.config;
-import fcl.schema;
-
 template <>
 struct fcl::schema::rules<http_config> {
    static fcl::schema::object_schema<http_config> define() {
       auto schema = fcl::schema::object<http_config>();
-      schema.field<&http_config::bind_port>("bind-port").default_value(8080).range(1, 65535);
+      schema.field<&http_config::bind_port>("bind-port").default_value(8080).range(1, 65'535);
       schema.field<&http_config::tls_enabled>("tls-enabled").default_value(false);
       return schema;
    }
 };
-```
-
-### Implement A Plugin
-
-```cpp
-import fcl.app.plugin;
-import fcl.config;
 
 class http_plugin final : public fcl::app::plugin {
-public:
-   fcl::app::plugin_id id() const override { return {"http"}; }
+ public:
+   fcl::app::plugin_id id() const override { return {.value = "http"}; }
    std::string version() const override { return "1"; }
 
    std::optional<fcl::config::component_descriptor> describe_config() const override {
@@ -141,70 +113,233 @@ public:
    }
 
    boost::asio::awaitable<void> configure(fcl::config::component_view view) override {
-      port_ = view.get_or<std::uint16_t>("bind-port", 8080);
+      bind_port_ = view.get_or<std::uint16_t>("bind-port", 8080);
+      tls_enabled_ = view.get_or<bool>("tls-enabled", false);
       co_return;
    }
 
-   boost::asio::awaitable<void> initialize(fcl::app::plugin_context&) override { co_return; }
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+      context.events().publish(fcl::app::event_severity::info, "http.initialize", "configured");
+      co_return;
+   }
+
    boost::asio::awaitable<void> startup() override { co_return; }
    boost::asio::awaitable<void> shutdown() override { co_return; }
 
-private:
-   std::uint16_t port_ = 8080;
+ private:
+   std::uint16_t bind_port_ = 8080;
+   bool tls_enabled_ = false;
 };
 ```
 
-### Subscribe To Lifecycle Signals
+## Plugin Enable/Disable
 
-`signal_bus` is a typed lifecycle notification channel. Use it for metrics,
-diagnostics and operator-visible state. Do not use it as hidden business flow;
-plugins should still communicate through ports or explicit APIs.
+Every registered plugin gets a shell-owned selection key:
 
-```cpp
-import fcl.app.signals;
-
-auto signals = fcl::app::signal_bus{};
-auto started = signals.plugin_started.connect([](const fcl::app::plugin_signal& event) {
-   record_metric("plugin.started", event.plugin);
-});
-auto stopped = signals.plugin_stopped.connect([](const fcl::app::plugin_signal& event) {
-   record_metric("plugin.stopped", event.plugin);
-});
-
-// Keep returned boost::signals2::connection objects if you need to disconnect.
-started.disconnect();
-stopped.disconnect();
+```yaml
+plugins:
+   http:
+      enabled: true
+   metrics:
+      enabled: false
 ```
 
-### Run A Foreground Program
+The default comes from `plugin_descriptor.enabled_by_default`. Disabled plugins
+are not configured, initialized, started or shut down. If an enabled plugin
+depends on a disabled plugin, the shell fails before lifecycle side effects.
 
-`fcl_app` does not install OS signal handlers by itself. A binary decides how to
-bridge `SIGINT`/`SIGTERM`, platform service stop requests or test hooks into
-`request_stop()`.
+```cpp
+void on_register_plugins(fcl::app::plugin_registry& registry) override {
+   registry.register_plugin(fcl::app::plugin_descriptor{
+      .id = {.value = "store"},
+      .factory = [] { return std::make_unique<store_plugin>(); },
+   });
+   registry.register_plugin(fcl::app::plugin_descriptor{
+      .id = {.value = "api"},
+      .dependencies = {fcl::app::plugin_id{.value = "store"}},
+      .factory = [] { return std::make_unique<api_plugin>(); },
+   });
+   registry.register_plugin(fcl::app::plugin_descriptor{
+      .id = {.value = "metrics"},
+      .enabled_by_default = false,
+      .factory = [] { return std::make_unique<metrics_plugin>(); },
+   });
+}
+
+auto document = fcl::config::document{};
+document.set("plugins.metrics.enabled", true);
+document.set("plugins.api.enabled", false);
+app.configure(document);
+```
+
+## Application Shell Example
+
+The derived app declares only product-specific hooks. It does not store
+`plugin_context`, `application_runtime`, diagnostics, events, signals and ports
+as repeated boilerplate members.
+
+```cpp
+struct service_config {
+   std::uint16_t workers = 2;
+};
+
+BOOST_DESCRIBE_STRUCT(service_config, (), (workers))
+
+template <>
+struct fcl::schema::rules<service_config> {
+   static fcl::schema::object_schema<service_config> define() {
+      auto schema = fcl::schema::object<service_config>();
+      schema.field<&service_config::workers>("workers").default_value(2).range(1, 64);
+      return schema;
+   }
+};
+
+class service_application final : public fcl::app::application_shell {
+ public:
+   service_application()
+       : fcl::app::application_shell{fcl::app::application_shell_options{
+            .name = "service",
+            .runtime = {.worker_threads = 2, .thread_name = "service"},
+         }} {}
+
+ protected:
+   void on_describe_config(fcl::config::component_registry& registry) const override {
+      registry.add(fcl::config::describe_component<service_config>("service"));
+   }
+
+   boost::asio::awaitable<void> on_configure(fcl::app::configure_context& context) override {
+      workers_ = context.view("service").get_or<std::uint16_t>("workers", 2);
+      co_return;
+   }
+
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "http"},
+         .factory = [] {
+            return std::make_unique<http_plugin>();
+         },
+      });
+   }
+
+   boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+      context.events().publish(
+         fcl::app::event_severity::info,
+         "service.configure",
+         "worker slots: " + std::to_string(workers_));
+      co_return;
+   }
+
+ private:
+   std::uint16_t workers_ = 0;
+};
+```
+
+## Application Builder Example
+
+`application_builder` is convenience syntax for simple daemons and tests. It
+does not define a second lifecycle: `build()` returns
+`std::unique_ptr<fcl::app::application_shell>`, and the generated shell still
+owns config merge, plugin lifecycle, rollback, ports, events and diagnostics.
 
 ```cpp
 import fcl.app;
-import fcl.asio.blocking;
+import fcl.asio.runtime;
 
-auto app = service_app{make_plugins()};
+auto workers = std::uint16_t{0};
+auto builder = fcl::app::application_builder{};
 
-try {
-   fcl::asio::blocking::run(app.runtime(), app.initialize());
-   fcl::asio::blocking::run(app.runtime(), app.startup());
-   wait_for_process_signal([&] { app.request_stop(); });
-   fcl::asio::blocking::run(app.runtime(), app.shutdown());
-} catch (...) {
-   app.request_stop();
-   fcl::asio::blocking::run(app.runtime(), app.shutdown());
-   throw;
-}
+builder.name("service")
+   .runtime(fcl::asio::runtime_options{.worker_threads = 2, .thread_name = "service"})
+   .config<service_config>("service", [&](const service_config& config) {
+      workers = config.workers;
+   })
+   .install_ports([&](fcl::app::application_context& context) {
+      context.events().publish(
+         fcl::app::event_severity::info,
+         "service.configure",
+         "worker slots: " + std::to_string(workers));
+   })
+   .plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "http"},
+      .factory = [] {
+         return std::make_unique<http_plugin>();
+      },
+   })
+   .run_foreground([](fcl::app::application_shell& app) {
+      app.request_stop();
+      return 0;
+   });
+
+std::unique_ptr<fcl::app::application_shell> app = std::move(builder).build();
 ```
 
-### Bridge OS Signals Into `request_stop()`
+Use the subclass form when the application has substantial state or non-trivial
+composition. Use the builder form when callbacks are enough and you want to keep
+the program entrypoint compact.
 
-The app layer keeps signal policy outside the framework, but it composes cleanly
-with `boost::asio::signal_set` when a program wants POSIX-style foreground
-shutdown.
+## Running The Shell
+
+Config can come from YAML, JSON, environment adapters or CLI. The shell only
+receives a neutral `fcl::config::document`.
+
+```cpp
+import fcl.asio.blocking;
+import fcl.config;
+
+auto app = service_application{};
+
+auto document = fcl::config::document{};
+document.set("service.workers", 4U);
+document.set("http.bind-port", 9090U);
+
+app.configure(document);
+fcl::asio::blocking::run(app.runtime(), app.startup());
+app.request_stop();
+fcl::asio::blocking::run(app.runtime(), app.shutdown());
+```
+
+`startup()` calls `initialize()` automatically when the shell is still in the
+created state. Tests may call `initialize()` explicitly when they need to assert
+port installation before startup.
+
+For production foreground daemons prefer `run_application(...)`. It
+standardizes the common flow: configure, startup, wait, request stop, shutdown.
+
+```cpp
+import fcl.app;
+import fcl.config;
+
+auto app = service_application{};
+auto document = fcl::config::document{};
+document.set("service.workers", 4U);
+
+auto options = fcl::app::run_options{
+   .handle_sigint = true,
+   .handle_sigterm = true,
+   .shutdown_timeout = std::chrono::seconds{10},
+};
+
+return fcl::app::run_application(app, document, options);
+```
+
+Tests and embedders can replace OS signals with a custom async waiter:
+
+```cpp
+options.handle_sigint = false;
+options.handle_sigterm = false;
+options.wait_for_stop = [](fcl::app::application_shell& app) -> boost::asio::awaitable<void> {
+   auto timer = boost::asio::steady_timer{app.runtime().context()};
+   timer.expires_after(std::chrono::milliseconds{50});
+   co_await timer.async_wait(boost::asio::use_awaitable);
+};
+```
+
+## Signal Bridge
+
+`request_stop()` remains synchronous and `noexcept`; that makes it safe to call
+from OS signal bridges and platform service callbacks. Use the runner for
+normal foreground daemons; write a manual bridge only when embedding FCL into a
+larger host runtime.
 
 ```cpp
 #include <boost/asio/co_spawn.hpp>
@@ -213,93 +348,64 @@ shutdown.
 #include <boost/asio/use_awaitable.hpp>
 
 #include <csignal>
+#include <memory>
 
-import fcl.asio.runtime;
-
-auto app = service_app{make_plugins()};
-auto signals = boost::asio::signal_set{app.runtime().context(), SIGINT, SIGTERM};
+auto app = service_application{};
+auto signals = std::make_shared<boost::asio::signal_set>(
+   app.runtime().context(),
+   SIGINT,
+   SIGTERM);
 
 boost::asio::co_spawn(
    app.runtime().context(),
-   [&]() -> boost::asio::awaitable<void> {
-      co_await signals.async_wait(boost::asio::use_awaitable);
+   [&app, signals]() -> boost::asio::awaitable<void> {
+      co_await signals->async_wait(boost::asio::use_awaitable);
       app.request_stop();
    },
    boost::asio::detached);
 ```
 
-`request_stop()` must stay `noexcept` because signal bridges and platform service
-callbacks need a safe synchronous edge. Cleanup still belongs to async
-`shutdown()`.
+## Ports
 
-### Emit Lifecycle Diagnostics From Signals
-
-`signal_bus` is useful for readable lifecycle logs without coupling plugins to a
-specific logger.
+Ports are typed interfaces shared through `plugin_context` and
+`application_context`. Use ports for explicit runtime contracts. Do not use the
+event bus for request/response business flow.
 
 ```cpp
-auto connection = signals.plugin_stopped.connect(
-   [&](const fcl::app::plugin_signal& event) {
-      events.publish(
-         fcl::app::event_severity::info,
-         "plugin.lifecycle",
-         event.plugin + " stopped");
-   });
-```
-
-Keep the returned connection if the subscriber has a shorter lifetime than the
-application.
-
-### Install And Consume Ports
-
-Ports are typed interfaces. They are how plugins share runtime services without
-stringly-typed event coupling.
-
-```cpp
-import fcl.app.ports;
-
 class clock_port {
-public:
+ public:
    virtual ~clock_port() = default;
    virtual std::chrono::system_clock::time_point now() const = 0;
 };
 
-context.ports().install<clock_port>(std::make_shared<system_clock_port>());
+class system_clock_port final : public clock_port {
+ public:
+   std::chrono::system_clock::time_point now() const override {
+      return std::chrono::system_clock::now();
+   }
+};
+
+boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+   context.ports().install<clock_port>(std::make_shared<system_clock_port>());
+   co_return;
+}
 
 auto clock = context.ports().get<clock_port>();
-auto now = clock->now();
 ```
 
-### Publish Events Without Creating Business Flow
+## Events And Diagnostics
 
-Events are for diagnostics and operator visibility. They should not replace
-typed ports or direct API calls between components.
+Events are for operator visibility. Diagnostics preserve lifecycle state and
+last errors for app/plugin startup.
 
 ```cpp
-import fcl.app.events;
-
-context.events().publish(
-   fcl::app::event_severity::info,
-   "http.startup",
-   "server is listening");
-
-auto subscription = context.events().subscribe({
-   .topic = "http",
+auto subscription = app.events().subscribe({
+   .topic = "app",
    .min_severity = fcl::app::event_severity::warning,
    .include_child_topics = true,
 });
 
-while (auto event = subscription.poll()) {
-   render_event(*event);
-}
-```
-
-### Read Diagnostics Snapshot
-
-```cpp
-import fcl.app.diagnostics;
-
-auto snapshot = diagnostics.snapshot(events);
+auto snapshot = app.diagnostics().snapshot(app.events());
 for (const auto& plugin : snapshot.plugins) {
    if (!plugin.last_error.empty()) {
       report(plugin.id, plugin.last_error);
@@ -307,114 +413,89 @@ for (const auto& plugin : snapshot.plugins) {
 }
 ```
 
-### Runtime Flow
+## Startup Failure And Rollback
 
-```cpp
-import fcl.app;
-
-auto runtime = fcl::app::application_runtime{context, std::move(plugins)};
-auto registry = runtime.describe_config();
-co_await runtime.configure(config_document);
-co_await runtime.initialize();
-co_await runtime.startup();
-runtime.request_stop();
-co_await runtime.shutdown();
-```
-
-### Handle Startup Failure With Rollback
-
-`application_runtime::startup()` rolls back already-started plugins through
-`shutdown()` when a later plugin fails. A program should still record the failure
-and request stop before returning an error code.
+Plugin order comes from `plugin_registry` dependencies. Startup runs in that
+order; shutdown runs in reverse order. If plugin `B` fails during startup after
+plugin `A` started, the shell asks the runtime to shut down started plugins and
+records diagnostics.
 
 ```cpp
 #include <fcl/exception/macros.hpp>
 
-import fcl.app;
-import fcl.exception.exception;
-
 try {
-   co_await runtime.configure(config_document);
-   co_await runtime.initialize();
-   co_await runtime.startup();
+   app.configure(document);
+   fcl::asio::blocking::run(app.runtime(), app.startup());
 } FCL_CAPTURE_AND_RETHROW(
    "application startup failed",
-   fcl::error::ctx("program", "service"))
+   fcl::error::ctx("component", "service"))
 ```
 
-The diagnostics store keeps the plugin lifecycle state, so operator-facing
-tools can show which plugin failed and which plugins were shut down during
-rollback.
+The app should still call `request_stop()` and `shutdown()` from the outer
+entrypoint cleanup path. Both calls are idempotent enough for normal failure
+handling.
 
-### Compose Config From Adapters Outside `fcl_app`
+The cleanup path is not optional ceremony. It keeps failed startup paths from
+leaving ports, background jobs or plugins in half-started states. Prefer
+`run_application(...)` for normal foreground daemons because it centralizes that
+flow.
+
+## Lower-Level Escape Hatch
+
+`application_runtime` remains available when a host framework already owns
+runtime, ports, signals and diagnostics. That is an escape hatch, not the normal
+daemon pattern. Prefer `application_shell` or `application_builder` for new
+services.
 
 ```cpp
-import fcl.config;
-import fcl.program_options;
-import fcl.yaml;
-
-auto registry = runtime.describe_config();
-auto file = fcl::yaml::load_document(config_path);
-auto cli = fcl::program_options::parse(argc, argv, registry);
-
-auto effective = fcl::config::merge({
-   file.value,
-   cli.document,
-});
-
-co_await runtime.configure(effective);
+auto runtime = fcl::app::application_runtime{context, std::move(plugins), &diagnostics};
+co_await runtime.configure(document);
+co_await runtime.startup();
+co_await runtime.shutdown();
 ```
-
-### Shape A Program Entrypoint
-
-The recommended foreground shape is explicit: configure, initialize, startup,
-wait for a stop signal, then shutdown. Tests can replace `wait_for_stop_signal`
-with a deterministic hook.
-
-```cpp
-import fcl.asio.blocking;
-
-int main(int argc, char** argv) {
-   auto app = service_app{make_plugins()};
-
-   try {
-      fcl::asio::blocking::run(app.runtime(), app.initialize());
-      fcl::asio::blocking::run(app.runtime(), app.startup());
-      wait_for_stop_signal([&] { app.request_stop(); });
-      fcl::asio::blocking::run(app.runtime(), app.shutdown());
-      return 0;
-   } catch (...) {
-      app.request_stop();
-      fcl::asio::blocking::run(app.runtime(), app.shutdown());
-      throw;
-   }
-}
-```
-
-## Lifecycle Contract
-
-Order is always:
-
-1. collect config descriptors;
-2. configure plugins;
-3. initialize;
-4. startup;
-5. request stop;
-6. shutdown.
-
-Startup failure rolls back already-started plugins through shutdown where
-possible and records diagnostics.
 
 ## Typical Mistakes
 
-- Do not make plugin constructors perform I/O; use `initialize`.
-- Do not assume `request_stop()` awaits cleanup; it is synchronous and noexcept.
-- Do not keep parser-specific types in plugin APIs.
-- Do not use the event bus for request/response control flow.
-- Do not install broad concrete implementation classes as ports; expose narrow
-  interfaces.
+- Do not copy shell-owned members into every product application.
+- Do not use `application_builder` to define another lifecycle; it only creates
+  a shell.
+- Do not manually instantiate plugins in product startup code when
+  `application_shell` can own the registry.
+- Do not configure plugin options from `build_plugins()`; plugin config belongs
+  to `plugin::describe_config()` and `plugin::configure(component_view)`.
+- Do not parse `argv`, `YAML::Node` or backend parser objects inside plugins.
+- Do not put secrets into events or diagnostics without redaction first.
+- Do not assume `request_stop()` waits for cleanup; it only requests shutdown.
+- Do not stop the scheduler or `io_context` from a stop callback or hook.
+  Plugins may still need async cleanup work during `shutdown()`.
+- Do not ignore failed `initialize()` or `startup()`. Treat the shell as stopped
+  and create a new instance if the product wants another attempt.
+- Do not use `abort()` from signal handlers or lifecycle catches. Request stop,
+  run shutdown at the product boundary, then return an error.
+
+## Runtime Risks And Anti-Patterns
+
+- A plugin that starts background work must own cancellation and shutdown.
+  Hidden detached work is a process-lifetime leak.
+- Ports must be installed before plugins initialize and must outlive plugin
+  shutdown. Removing ports early creates use-after-shutdown failures.
+- Event subscribers should keep their connection lifetime explicit. Capturing a
+  short-lived object in a long-lived signal/event callback is a common crash
+  source.
+- Events and diagnostics are observability surfaces, not recovery. Log/report
+  them, but still propagate correctness-path failures to the caller.
+- Lower-level `application_runtime` users must preserve the same lifecycle
+  ordering as the shell. If they cannot, they should use `application_shell`
+  instead of reimplementing daemon plumbing.
 
 ## Tests
 
-`test_fcl_app` covers port registry, event bus bounds, plugin ordering, config
-collection, lifecycle rollback and diagnostics.
+`test_fcl_app` covers port registry, event bus bounds, plugin dependency order,
+config collection, shell-owned default merge, configure-before-initialize,
+startup rollback, reverse shutdown and diagnostics.
+
+Buildable examples:
+
+- [`examples/app/application_lifecycle.cpp`](../../examples/app/application_lifecycle.cpp)
+- [`examples/app/application_builder.cpp`](../../examples/app/application_builder.cpp)
+- [`examples/app/exception_logging.cpp`](../../examples/app/exception_logging.cpp)

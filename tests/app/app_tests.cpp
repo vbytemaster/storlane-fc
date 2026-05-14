@@ -1,9 +1,16 @@
 #include <boost/test/unit_test.hpp>
 
 #include <boost/asio/awaitable.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/use_awaitable.hpp>
+#include <boost/describe.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -38,6 +45,65 @@ class sample_port_impl final : public sample_port {
 struct lifecycle_log {
    std::vector<std::string> entries;
 };
+
+struct slow_shutdown_state {
+   mutable std::mutex mutex;
+   std::condition_variable ready;
+   bool shutdown_done = false;
+   bool destroyed = false;
+
+   void mark_shutdown_done() {
+      {
+         const auto lock = std::scoped_lock{mutex};
+         shutdown_done = true;
+      }
+      ready.notify_all();
+   }
+
+   void mark_destroyed() {
+      {
+         const auto lock = std::scoped_lock{mutex};
+         destroyed = true;
+      }
+      ready.notify_all();
+   }
+
+   bool shutdown_finished() const {
+      const auto lock = std::scoped_lock{mutex};
+      return shutdown_done;
+   }
+
+   bool shell_destroyed() const {
+      const auto lock = std::scoped_lock{mutex};
+      return destroyed;
+   }
+
+   bool wait_for_shutdown(std::chrono::milliseconds timeout) {
+      auto lock = std::unique_lock{mutex};
+      return ready.wait_for(lock, timeout, [&] {
+         return shutdown_done;
+      });
+   }
+
+   bool wait_for_destroyed(std::chrono::milliseconds timeout) {
+      auto lock = std::unique_lock{mutex};
+      return ready.wait_for(lock, timeout, [&] {
+         return destroyed;
+      });
+   }
+};
+
+struct shell_service_config {
+   std::uint16_t workers = 2;
+};
+
+BOOST_DESCRIBE_STRUCT(shell_service_config, (), (workers))
+
+struct shell_plugin_config {
+   std::uint16_t port = 9000;
+};
+
+BOOST_DESCRIBE_STRUCT(shell_plugin_config, (), (port))
 
 class test_plugin final : public fcl::app::plugin {
  public:
@@ -139,6 +205,394 @@ fcl::app::plugin_descriptor descriptor(std::string id, lifecycle_log& log,
                    fail_startup] { return std::make_unique<test_plugin>(id_copy.value, log, fail_startup); },
    };
 }
+
+} // namespace
+
+template <>
+struct fcl::schema::rules<shell_service_config> {
+   static fcl::schema::object_schema<shell_service_config> define() {
+      auto schema = fcl::schema::object<shell_service_config>();
+      schema.field<&shell_service_config::workers>("workers").default_value(2).range(1, 32);
+      return schema;
+   }
+};
+
+template <>
+struct fcl::schema::rules<shell_plugin_config> {
+   static fcl::schema::object_schema<shell_plugin_config> define() {
+      auto schema = fcl::schema::object<shell_plugin_config>();
+      schema.field<&shell_plugin_config::port>("port").default_value(9000).range(1, 65'535);
+      return schema;
+   }
+};
+
+namespace {
+
+class shell_config_plugin final : public fcl::app::plugin {
+ public:
+   shell_config_plugin(lifecycle_log& log) : log_{&log} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "http"};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   std::optional<fcl::config::component_descriptor> describe_config() const override {
+      return fcl::config::describe_component<shell_plugin_config>("http");
+   }
+
+   boost::asio::awaitable<void> configure(fcl::config::component_view view) override {
+      port_ = view.get_or<std::uint16_t>("port", 0);
+      log_->entries.push_back("plugin.configure:" + std::to_string(port_));
+      co_return;
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+      log_->entries.push_back("plugin.initialize:" + std::to_string(port_));
+      context.events().publish(fcl::app::event_severity::info, "shell.plugin", "initialized");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      log_->entries.push_back("plugin.startup");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      log_->entries.push_back("plugin.shutdown");
+      co_return;
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   std::uint16_t port_ = 0;
+};
+
+class shell_dependency_plugin final : public fcl::app::plugin {
+ public:
+   shell_dependency_plugin(std::string id, lifecycle_log& log) : id_{std::move(id)}, log_{&log} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = id_};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context&) override {
+      log_->entries.push_back("initialize:" + id_);
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      log_->entries.push_back("startup:" + id_);
+      co_return;
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      log_->entries.push_back("shutdown:" + id_);
+      co_return;
+   }
+
+ private:
+   std::string id_;
+   lifecycle_log* log_ = nullptr;
+};
+
+class scheduler_cleanup_plugin final : public fcl::app::plugin {
+ public:
+   explicit scheduler_cleanup_plugin(lifecycle_log& log) : log_{&log} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "cleanup"};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+      scheduler_ = &context.scheduler();
+      log_->entries.push_back("initialize:cleanup");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      log_->entries.push_back("startup:cleanup");
+      co_return;
+   }
+
+   void request_stop() noexcept override {
+      log_->entries.push_back("request_stop:cleanup");
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      auto handle = scheduler_->submit(fcl::asio::scheduled_task{
+         .priority = fcl::asio::priority{1},
+         .name = "cleanup-flush",
+         .work = [this] {
+            log_->entries.push_back("cleanup.scheduler.work");
+         },
+      });
+      co_await handle.wait();
+      log_->entries.push_back("shutdown:cleanup");
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   fcl::asio::task_scheduler* scheduler_ = nullptr;
+};
+
+class failing_initialize_plugin final : public fcl::app::plugin {
+ public:
+   explicit failing_initialize_plugin(lifecycle_log& log) : log_{&log} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "init-fail"};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context&) override {
+      log_->entries.push_back("initialize:init-fail");
+      throw std::runtime_error{"initialize failed"};
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      log_->entries.push_back("startup:init-fail");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      log_->entries.push_back("shutdown:init-fail");
+      co_return;
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
+class slow_shutdown_plugin final : public fcl::app::plugin {
+ public:
+   slow_shutdown_plugin(lifecycle_log& log, std::shared_ptr<slow_shutdown_state> state)
+       : log_{&log}, state_{std::move(state)} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "slow"};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+      context_ = &context;
+      log_->entries.push_back("initialize:slow");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      log_->entries.push_back("startup:slow");
+      co_return;
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      auto timer = boost::asio::steady_timer{context_->scheduler().runtime_context().context()};
+      timer.expires_after(std::chrono::milliseconds{100});
+      co_await timer.async_wait(boost::asio::use_awaitable);
+      log_->entries.push_back("shutdown:slow");
+      state_->mark_shutdown_done();
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   std::shared_ptr<slow_shutdown_state> state_;
+   fcl::app::plugin_context* context_ = nullptr;
+};
+
+class shell_test_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_test_application(lifecycle_log& log)
+       : fcl::app::application_shell{fcl::app::application_shell_options{
+            .name = "shell-test",
+            .runtime = {.worker_threads = 1, .thread_name = "shell-test"},
+         }},
+         log_{&log} {}
+
+   int run_count() {
+      return run();
+   }
+
+   std::uint16_t workers() const noexcept {
+      return workers_;
+   }
+
+ protected:
+   void on_describe_config(fcl::config::component_registry& registry) const override {
+      registry.add(fcl::config::describe_component<shell_service_config>("service"));
+   }
+
+   boost::asio::awaitable<void> on_configure(fcl::app::configure_context& context) override {
+      workers_ = context.view("service").get_or<std::uint16_t>("workers", 0);
+      log_->entries.push_back("app.configure:" + std::to_string(workers_));
+      co_return;
+   }
+
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "http"},
+         .factory = [this] {
+            return std::make_unique<shell_config_plugin>(*log_);
+         },
+      });
+   }
+
+   boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+      context.ports().install<sample_port>(std::make_shared<sample_port_impl>(workers_));
+      log_->entries.push_back("app.install_ports:" + std::to_string(context.ports().size()));
+      co_return;
+   }
+
+   int on_run_foreground() override {
+      log_->entries.push_back("app.run");
+      request_stop();
+      return 7;
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   std::uint16_t workers_ = 0;
+};
+
+class shell_order_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_order_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "store"},
+         .factory = [this] {
+            return std::make_unique<shell_dependency_plugin>("store", *log_);
+         },
+      });
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "api"},
+         .dependencies = {fcl::app::plugin_id{.value = "store"}},
+         .factory = [this] {
+            return std::make_unique<shell_dependency_plugin>("api", *log_);
+         },
+      });
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
+class shell_failure_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_failure_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(descriptor("store", *log_));
+      registry.register_plugin(descriptor(
+         "api",
+         *log_,
+         {fcl::app::plugin_id{.value = "store"}},
+         true,
+         true));
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
+class shell_initialize_failure_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_initialize_failure_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "init-fail"},
+         .factory = [this] {
+            return std::make_unique<failing_initialize_plugin>(*log_);
+         },
+      });
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
+class shell_scheduler_cleanup_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_scheduler_cleanup_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "cleanup"},
+         .factory = [this] {
+            return std::make_unique<scheduler_cleanup_plugin>(*log_);
+         },
+      });
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
+class shell_slow_shutdown_application final : public fcl::app::application_shell {
+ public:
+   shell_slow_shutdown_application(lifecycle_log& log, std::shared_ptr<slow_shutdown_state> state)
+       : fcl::app::application_shell{fcl::app::application_shell_options{
+            .name = "slow-shutdown",
+            .runtime = {.worker_threads = 1, .thread_name = "slow-shutdown"},
+         }},
+         log_{&log},
+         state_{std::move(state)} {}
+
+   ~shell_slow_shutdown_application() override {
+      state_->mark_destroyed();
+   }
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "slow"},
+         .factory = [this] {
+            return std::make_unique<slow_shutdown_plugin>(*log_, state_);
+         },
+      });
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   std::shared_ptr<slow_shutdown_state> state_;
+};
+
+class shell_selection_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_selection_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(descriptor("store", *log_));
+      registry.register_plugin(descriptor("api", *log_, {fcl::app::plugin_id{.value = "store"}}));
+      registry.register_plugin(descriptor("metrics", *log_, {}, false));
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
 
 } // namespace
 
@@ -345,4 +799,405 @@ BOOST_AUTO_TEST_CASE(application_runtime_collects_and_applies_plugin_config_befo
    BOOST_TEST(log.entries[1] == "initialize:configurable");
    BOOST_TEST(log.entries[2] == "startup:configurable");
    BOOST_TEST(log.entries[3] == "shutdown:configurable");
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_owns_config_plugin_lifecycle_and_context) {
+   auto log = lifecycle_log{};
+   auto app = shell_test_application{log};
+
+   const auto registry = app.describe_config();
+   BOOST_REQUIRE_EQUAL(registry.components().size(), 3U);
+   BOOST_TEST(registry.components()[0].section == "service");
+   BOOST_TEST(registry.components()[1].section == "plugins");
+   BOOST_TEST(registry.components()[2].section == "http");
+
+   auto document = fcl::config::document{};
+   document.set("service.workers", 4);
+   app.configure(document);
+
+   fcl::asio::blocking::run(app.runtime(), app.initialize());
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+
+   BOOST_TEST(app.workers() == 4U);
+   BOOST_TEST(app.ports().get<sample_port>()->value() == 4);
+
+   const auto exit_code = app.run_count();
+   BOOST_TEST(exit_code == 7);
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "app.configure:4",
+      "plugin.configure:9000",
+      "app.install_ports:1",
+      "plugin.initialize:9000",
+      "plugin.startup",
+      "app.run",
+      "plugin.shutdown",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_preserves_dependency_order_and_reverse_shutdown) {
+   auto log = lifecycle_log{};
+   auto app = shell_order_application{log};
+
+   app.configure(fcl::config::document{});
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "initialize:store",
+      "initialize:api",
+      "startup:store",
+      "startup:api",
+      "shutdown:api",
+      "shutdown:store",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_rolls_back_started_plugins_on_startup_failure) {
+   auto log = lifecycle_log{};
+   auto app = shell_failure_application{log};
+
+   BOOST_CHECK_THROW(fcl::asio::blocking::run(app.runtime(), app.startup()), std::runtime_error);
+   BOOST_TEST(static_cast<int>(app.state()) == static_cast<int>(fcl::app::application_state::stopped));
+
+   const auto expected = std::vector<std::string>{
+      "initialize:store",
+      "initialize:api",
+      "startup:store",
+      "startup:api",
+      "shutdown:api",
+      "shutdown:store",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+
+   const auto snapshot = app.diagnostics().snapshot(app.events());
+   BOOST_TEST(static_cast<int>(snapshot.state) == static_cast<int>(fcl::app::lifecycle_state::failed));
+   BOOST_TEST(snapshot.last_error == "startup failed");
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_keeps_scheduler_available_until_shutdown_finishes) {
+   auto log = lifecycle_log{};
+   auto app = shell_scheduler_cleanup_application{log};
+
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+   app.request_stop();
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+
+   const auto cleanup = std::ranges::find(log.entries, "cleanup.scheduler.work");
+   const auto shutdown = std::ranges::find(log.entries, "shutdown:cleanup");
+   BOOST_REQUIRE(cleanup != log.entries.end());
+   BOOST_REQUIRE(shutdown != log.entries.end());
+   BOOST_CHECK(cleanup < shutdown);
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_initialize_failure_transitions_to_stopped) {
+   auto log = lifecycle_log{};
+   auto app = shell_initialize_failure_application{log};
+
+   BOOST_CHECK_THROW(fcl::asio::blocking::run(app.runtime(), app.initialize()), std::runtime_error);
+   BOOST_TEST(static_cast<int>(app.state()) == static_cast<int>(fcl::app::application_state::stopped));
+   BOOST_CHECK_THROW(fcl::asio::blocking::run(app.runtime(), app.startup()), std::logic_error);
+
+   const auto expected = std::vector<std::string>{
+      "initialize:init-fail",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_applies_plugin_selection_from_config) {
+   auto log = lifecycle_log{};
+   auto app = shell_selection_application{log};
+
+   const auto registry = app.describe_config();
+   auto found_plugins_section = false;
+   for (const auto& component : registry.components()) {
+      if (component.section == "plugins") {
+         found_plugins_section = true;
+         BOOST_REQUIRE_EQUAL(component.fields.size(), 3U);
+         BOOST_TEST(component.fields[0].name == "store.enabled");
+         BOOST_TEST(component.fields[1].name == "api.enabled");
+         BOOST_TEST(component.fields[2].name == "metrics.enabled");
+         BOOST_TEST(component.fields[0].has_default);
+         BOOST_TEST(std::get<bool>(component.fields[0].default_value.storage));
+         BOOST_TEST(!std::get<bool>(component.fields[2].default_value.storage));
+      }
+   }
+   BOOST_TEST(found_plugins_section);
+
+   auto document = fcl::config::document{};
+   document.set("plugins.api.enabled", false);
+   document.set("plugins.metrics.enabled", true);
+   app.configure(document);
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "initialize:store",
+      "initialize:metrics",
+      "startup:store",
+      "startup:metrics",
+      "shutdown:metrics",
+      "shutdown:store",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_accepts_textual_plugin_selection_flags) {
+   auto log = lifecycle_log{};
+   auto app = shell_selection_application{log};
+
+   auto document = fcl::config::document{};
+   document.set("plugins.api.enabled", "false");
+   document.set("plugins.metrics.enabled", "true");
+   app.configure(document);
+   fcl::asio::blocking::run(app.runtime(), app.startup());
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "initialize:store",
+      "initialize:metrics",
+      "startup:store",
+      "startup:metrics",
+      "shutdown:metrics",
+      "shutdown:store",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_rejects_invalid_textual_plugin_selection_flag) {
+   auto log = lifecycle_log{};
+   auto app = shell_selection_application{log};
+
+   auto document = fcl::config::document{};
+   document.set("plugins.api.enabled", "definitely");
+
+   BOOST_CHECK_THROW(app.configure(document), std::invalid_argument);
+   BOOST_TEST(log.entries.empty());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_rejects_enabled_plugin_with_disabled_dependency) {
+   auto log = lifecycle_log{};
+   auto app = shell_selection_application{log};
+
+   auto document = fcl::config::document{};
+   document.set("plugins.store.enabled", false);
+   document.set("plugins.api.enabled", true);
+
+   BOOST_CHECK_THROW(app.configure(document), std::logic_error);
+   BOOST_TEST(log.entries.empty());
+}
+
+BOOST_AUTO_TEST_CASE(run_application_executes_lifecycle_and_custom_stop_waiter) {
+   auto log = lifecycle_log{};
+   auto app = shell_order_application{log};
+
+   auto options = fcl::app::run_options{};
+   options.handle_sigint = false;
+   options.handle_sigterm = false;
+   options.wait_for_stop = [](fcl::app::application_shell& shell) -> boost::asio::awaitable<void> {
+      auto timer = boost::asio::steady_timer{shell.runtime().context()};
+      timer.expires_after(std::chrono::milliseconds{5});
+      co_await timer.async_wait(boost::asio::use_awaitable);
+      co_return;
+   };
+
+   const auto exit_code = fcl::app::run_application(app, fcl::config::document{}, options);
+   BOOST_TEST(exit_code == 0);
+   BOOST_TEST(static_cast<int>(app.state()) == static_cast<int>(fcl::app::application_state::stopped));
+
+   const auto expected = std::vector<std::string>{
+      "initialize:store",
+      "initialize:api",
+      "startup:store",
+      "startup:api",
+      "shutdown:api",
+      "shutdown:store",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(run_application_unique_ptr_reports_shutdown_timeout_after_cleanup_finishes) {
+   auto log = lifecycle_log{};
+   auto state = std::make_shared<slow_shutdown_state>();
+
+   auto app = std::make_unique<shell_slow_shutdown_application>(log, state);
+   auto options = fcl::app::run_options{};
+   options.handle_sigint = false;
+   options.handle_sigterm = false;
+   options.shutdown_timeout = std::chrono::milliseconds{1};
+
+   BOOST_CHECK_THROW(fcl::app::run_application(std::move(app), fcl::config::document{}, options), std::runtime_error);
+   BOOST_TEST(!state->shutdown_finished());
+   BOOST_TEST(!state->shell_destroyed());
+   BOOST_TEST(state->wait_for_shutdown(std::chrono::seconds{1}));
+   BOOST_TEST(state->wait_for_destroyed(std::chrono::seconds{1}));
+
+   const auto expected = std::vector<std::string>{
+      "initialize:slow",
+      "startup:slow",
+      "shutdown:slow",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(run_application_reference_reports_timeout_only_after_shutdown_finishes) {
+   auto log = lifecycle_log{};
+   auto state = std::make_shared<slow_shutdown_state>();
+
+   auto app = shell_slow_shutdown_application{log, state};
+   auto options = fcl::app::run_options{};
+   options.handle_sigint = false;
+   options.handle_sigterm = false;
+   options.shutdown_timeout = std::chrono::milliseconds{1};
+
+   auto threw_timeout = false;
+   try {
+      static_cast<void>(fcl::app::run_application(app, fcl::config::document{}, options));
+   } catch (const std::runtime_error&) {
+      threw_timeout = true;
+   }
+
+   const auto finished_before_return = state->shutdown_finished();
+   if (!finished_before_return) {
+      static_cast<void>(state->wait_for_shutdown(std::chrono::seconds{1}));
+   }
+
+   BOOST_TEST(threw_timeout);
+   BOOST_TEST(finished_before_return);
+   BOOST_TEST(!state->shell_destroyed());
+
+   const auto expected = std::vector<std::string>{
+      "initialize:slow",
+      "startup:slow",
+      "shutdown:slow",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_builder_creates_shell_and_applies_config_handlers) {
+   auto log = lifecycle_log{};
+   auto workers = std::uint16_t{0};
+   auto async_config_called = false;
+
+   auto builder = fcl::app::application_builder{};
+   builder.name("builder-test")
+      .runtime(fcl::asio::runtime_options{.worker_threads = 1, .thread_name = "builder-test"})
+      .config<shell_service_config>("service", [&](fcl::app::configure_context& context, const shell_service_config& config)
+                                    -> boost::asio::awaitable<void> {
+         workers = config.workers;
+         log.entries.push_back("typed.configure:" + std::to_string(workers));
+         BOOST_TEST(context.view("service").get_or<std::uint16_t>("workers", 0) == 6U);
+         co_return;
+      })
+      .configure([&](fcl::app::configure_context&) {
+         async_config_called = true;
+         log.entries.push_back("configure.extra");
+      })
+      .install_ports([&](fcl::app::application_context& context) {
+         context.ports().install<sample_port>(std::make_shared<sample_port_impl>(workers));
+         log.entries.push_back("install_ports:" + std::to_string(context.ports().size()));
+      })
+      .run_foreground([&](fcl::app::application_shell& shell) {
+         log.entries.push_back("run");
+         return shell.ports().get<sample_port>()->value();
+      });
+
+   auto app = std::move(builder).build();
+   const auto registry = app->describe_config();
+   BOOST_REQUIRE_EQUAL(registry.components().size(), 1U);
+   BOOST_TEST(registry.components()[0].section == "service");
+
+   auto document = fcl::config::document{};
+   document.set("service.workers", 6);
+   app->configure(document);
+   fcl::asio::blocking::run(app->runtime(), app->startup());
+
+   BOOST_TEST(async_config_called);
+   BOOST_TEST(workers == 6U);
+   BOOST_TEST(app->ports().get<sample_port>()->value() == 6);
+   BOOST_TEST(app->run() == 6);
+
+   fcl::asio::blocking::run(app->runtime(), app->shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "typed.configure:6",
+      "configure.extra",
+      "install_ports:1",
+      "run",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_builder_collects_plugin_config_and_preserves_dependency_order) {
+   auto log = lifecycle_log{};
+   auto builder = fcl::app::application_builder{};
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "http"},
+      .factory = [&log] {
+         return std::make_unique<shell_config_plugin>(log);
+      },
+   });
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "store"},
+      .factory = [&log] {
+         return std::make_unique<shell_dependency_plugin>("store", log);
+      },
+   });
+   builder.plugin(fcl::app::plugin_descriptor{
+      .id = fcl::app::plugin_id{.value = "api"},
+      .dependencies = {fcl::app::plugin_id{.value = "store"}},
+      .factory = [&log] {
+         return std::make_unique<shell_dependency_plugin>("api", log);
+      },
+   });
+
+   auto app = std::move(builder).build();
+   const auto registry = app->describe_config();
+   BOOST_REQUIRE_EQUAL(registry.components().size(), 2U);
+   BOOST_TEST(registry.components()[0].section == "plugins");
+   BOOST_TEST(registry.components()[1].section == "http");
+
+   app->configure(fcl::config::document{});
+   fcl::asio::blocking::run(app->runtime(), app->startup());
+   fcl::asio::blocking::run(app->runtime(), app->shutdown());
+
+   const auto expected = std::vector<std::string>{
+      "plugin.configure:9000",
+      "plugin.initialize:9000",
+      "initialize:store",
+      "initialize:api",
+      "plugin.startup",
+      "startup:store",
+      "startup:api",
+      "shutdown:api",
+      "shutdown:store",
+      "plugin.shutdown",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_builder_rejects_invalid_typed_config_before_side_effects) {
+   auto configured = false;
+   auto ports_installed = false;
+
+   auto builder = fcl::app::application_builder{};
+   builder.config<shell_service_config>("service", [&](const shell_service_config&) {
+      configured = true;
+   });
+   builder.install_ports([&](fcl::app::application_context& context) {
+      ports_installed = true;
+      context.ports().install<sample_port>(std::make_shared<sample_port_impl>(1));
+   });
+
+   auto app = std::move(builder).build();
+   auto document = fcl::config::document{};
+   document.set("service.workers", 99);
+
+   BOOST_CHECK_THROW(app->configure(document), std::invalid_argument);
+   BOOST_TEST(!configured);
+   BOOST_TEST(!ports_installed);
+   BOOST_TEST(!app->ports().try_get<sample_port>());
 }

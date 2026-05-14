@@ -955,9 +955,9 @@ tests/unit/fcl_compat
 ### Этап 6 — app
 
 - ports/plugins/events/diagnostics;
-- lifecycle runtime;
+- opinionated `application_shell`, который владеет runtime/scheduler/ports/events/signals/diagnostics/plugin registry;
 - async cleanup.
-- текущий v1 cleanup: `fcl_app` больше не зависит от `Boost.Program_options`, plugin lifecycle стал async.
+- текущий v1 cleanup: `fcl_app` больше не зависит от `Boost.Program_options`, plugin lifecycle стал async, production entrypoint задаётся `application_shell`.
 
 ### Этап 7 — network
 
