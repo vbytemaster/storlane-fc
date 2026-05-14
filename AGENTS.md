@@ -6,6 +6,17 @@ This repository is evolving into FCL: Foundation Core Libraries for modern C++ p
 
 The repository must stay neutral. Public APIs must not contain downstream product vocabulary or assumptions.
 
+## Branching
+
+- `dev` is the default development and integration branch.
+- All feature, fix, documentation and cleanup work must branch from the latest
+  `origin/dev` and target `dev` for review.
+- Direct work on `main` is forbidden for normal development. `main` is reserved
+  for release-ready promotion from `dev` after validation.
+- The only allowed direct `main` changes are explicit repository/bootstrap
+  maintenance tasks requested by the maintainer, such as creating this branch
+  policy before `dev` exists.
+
 ## Language And Toolchain
 
 - Target language: C++23.
