@@ -1477,6 +1477,28 @@ BOOST_AUTO_TEST_CASE(run_daemon_help_ignores_missing_explicit_config) {
    BOOST_TEST(state.log.entries.empty());
 }
 
+BOOST_AUTO_TEST_CASE(run_daemon_help_ignores_malformed_explicit_config) {
+   auto state = daemon_test_state{};
+   const auto dir = make_temp_dir("fcl-daemon-help-broken-config");
+   const auto config = dir / "broken.yml";
+   write_text(config, "daemon: [\n");
+   auto output = stream_capture{std::cout};
+
+   const auto exit_code = run_test_daemon(
+      {
+         "testd",
+         "--config",
+         config.string(),
+         "--help",
+      },
+      state);
+
+   BOOST_TEST(exit_code == 0);
+   BOOST_TEST(output.text().find("Daemon options") != std::string::npos);
+   BOOST_TEST(output.text().find("--service.workers") != std::string::npos);
+   BOOST_TEST(state.log.entries.empty());
+}
+
 BOOST_AUTO_TEST_CASE(run_daemon_explicit_missing_config_is_error_for_check_config) {
    auto state = daemon_test_state{};
    auto errors = stream_capture{std::cerr};
@@ -1514,6 +1536,59 @@ BOOST_AUTO_TEST_CASE(run_daemon_explicit_missing_dotenv_is_error_when_dotenv_sou
 
    BOOST_TEST(exit_code == 1);
    BOOST_TEST(errors.text().find("daemon.dotenv_missing") != std::string::npos);
+   BOOST_TEST(state.log.entries.empty());
+}
+
+BOOST_AUTO_TEST_CASE(run_daemon_reports_bootstrap_type_error_as_diagnostic) {
+   auto state = daemon_test_state{};
+   const auto dir = make_temp_dir("fcl-daemon-bootstrap-type-error");
+   const auto config = dir / "config.yml";
+   write_text(
+      config,
+      R"(daemon:
+  runtime-threads: four
+)");
+   auto errors = stream_capture{std::cerr};
+
+   auto exit_code = -1;
+   BOOST_CHECK_NO_THROW(exit_code = run_test_daemon(
+                           {
+                              "testd",
+                              "--config",
+                              config.string(),
+                              "--check-config",
+                           },
+                           state));
+
+   BOOST_TEST(exit_code == 1);
+   BOOST_TEST(errors.text().find("daemon.bootstrap") != std::string::npos);
+   BOOST_TEST(errors.text().find("runtime-threads") != std::string::npos);
+   BOOST_TEST(state.log.entries.empty());
+}
+
+BOOST_AUTO_TEST_CASE(run_daemon_reports_invalid_action_flag_type_as_diagnostic) {
+   auto state = daemon_test_state{};
+   const auto dir = make_temp_dir("fcl-daemon-bootstrap-bool-error");
+   const auto config = dir / "config.yml";
+   write_text(
+      config,
+      R"(daemon:
+  check-config: maybe
+)");
+   auto errors = stream_capture{std::cerr};
+
+   auto exit_code = -1;
+   BOOST_CHECK_NO_THROW(exit_code = run_test_daemon(
+                           {
+                              "testd",
+                              "--config",
+                              config.string(),
+                           },
+                           state));
+
+   BOOST_TEST(exit_code == 1);
+   BOOST_TEST(errors.text().find("daemon.bootstrap") != std::string::npos);
+   BOOST_TEST(errors.text().find("check-config") != std::string::npos);
    BOOST_TEST(state.log.entries.empty());
 }
 

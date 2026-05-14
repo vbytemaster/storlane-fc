@@ -390,6 +390,20 @@ bool has_errors(const std::vector<fcl::schema::diagnostic>& diagnostics) {
    return false;
 }
 
+void append_bootstrap_diagnostic(std::vector<fcl::schema::diagnostic>& diagnostics, const std::exception& error) {
+   diagnostics.push_back(fcl::schema::diagnostic{
+      .path = "daemon",
+      .code = "daemon.bootstrap",
+      .level = fcl::schema::severity::error,
+      .message = error.what(),
+   });
+}
+
+int fail_with_bootstrap_diagnostic(std::vector<fcl::schema::diagnostic>& diagnostics, const std::exception& error) {
+   append_bootstrap_diagnostic(diagnostics, error);
+   return fail_with_diagnostics(diagnostics);
+}
+
 fcl::config::document read_yaml_layer(const std::filesystem::path& path, bool required,
                                       std::vector<fcl::schema::diagnostic>& diagnostics) {
    if (path.empty() || !std::filesystem::exists(path)) {
@@ -560,142 +574,162 @@ int run_daemon(daemon_factory make_app, int argc, char** argv, daemon_options op
 
    const auto daemon_defaults = dynamic_daemon_defaults(options);
    const auto daemon_only_registry = daemon_registry();
-   auto early_process_env =
-      read_process_env_layer(daemon_only_registry, options, fcl::env::unknown_variable_policy::ignore, diagnostics);
-   if (has_errors(diagnostics)) {
-      return fail_with_diagnostics(diagnostics);
-   }
 
-   auto early_without_yaml = fcl::config::merge({daemon_defaults, early_process_env, daemon_cli.document});
-   auto early_context = context_from_document(options, early_without_yaml);
-   auto yaml = options.read_yaml ? read_yaml_layer(
-                                      early_context.config_path,
-                                      daemon_cli.config_explicit && !daemon_cli.configure && !daemon_cli.help,
-                                      diagnostics)
-                                 : fcl::config::document{};
-   if (has_errors(diagnostics)) {
-      return fail_with_diagnostics(diagnostics);
-   }
-
-   auto early_paths = resolve_daemon_paths(
-      fcl::config::merge({daemon_defaults, yaml, early_process_env, daemon_cli.document}), options);
-   auto early_path_context = context_from_document(options, early_paths);
-   auto early_dotenv = read_dotenv_layer(
-      early_path_context.dotenv_path,
-      daemon_only_registry,
-      options,
-      daemon_cli.dotenv_explicit && !daemon_cli.configure && !daemon_cli.help,
-      diagnostics);
-   if (has_errors(diagnostics)) {
-      return fail_with_diagnostics(diagnostics);
-   }
-
-   auto early_effective = resolve_daemon_paths(
-      fcl::config::merge({daemon_defaults, yaml, early_dotenv, early_process_env, daemon_cli.document}), options);
-   auto context = context_from_document(options, early_effective);
-   auto app = make_app(context);
-   if (!app) {
-      std::cerr << "error: daemon factory returned null application\n";
-      return 1;
-   }
-
-   const auto app_registry = app->describe_config();
-   auto registry = full_registry(app_registry);
-
-   auto dotenv = read_dotenv_layer(
-      context.dotenv_path,
-      registry,
-      options,
-      daemon_cli.dotenv_explicit && !daemon_cli.configure && !daemon_cli.help,
-      diagnostics);
-   auto process_env =
-      read_process_env_layer(registry, options, fcl::env::unknown_variable_policy::warn, diagnostics);
-   auto product_cli = read_product_cli_layer(daemon_cli.filtered_args, app_registry, options, diagnostics);
-   if (has_errors(diagnostics)) {
-      return fail_with_diagnostics(diagnostics);
-   }
-
-   auto effective = resolve_daemon_paths(
-      fcl::config::merge({
-         fcl::config::defaults_for(registry),
-         daemon_defaults,
-         yaml,
-         dotenv,
-         process_env,
-         daemon_cli.document,
-         product_cli,
-      }),
-      options);
-
-   const auto help = bool_field(effective, "daemon.help", false);
-   const auto check_config = bool_field(effective, "daemon.check-config", false);
-   const auto print_effective_config = bool_field(effective, "daemon.print-effective-config", false);
-   const auto configure = bool_field(effective, "daemon.configure", false);
-
-   if (help) {
-      std::cout << daemon_help(options, app_registry);
-      return 0;
-   }
-   if (configure) {
-      if (!options.allow_configure) {
-         std::cerr << "error: --configure is disabled for this daemon\n";
-         return 1;
-      }
-      const auto config_path = string_field(effective, "daemon.config", context.config_path.string());
-      if (std::filesystem::exists(config_path)) {
-         std::cerr << "error: refusing to overwrite existing config: " << config_path << '\n';
-         return 1;
-      }
-      const auto parent = std::filesystem::path{config_path}.parent_path();
-      if (!parent.empty()) {
-         std::filesystem::create_directories(parent);
-      }
-      auto generated =
-         fcl::config::merge({fcl::config::defaults_for(registry), daemon_defaults, early_process_env,
-                             daemon_cli.document});
-      reset_daemon_action_flags(generated);
-      generated = resolve_daemon_paths(std::move(generated), options);
-      auto saved = fcl::yaml::save_document(config_path, fcl::config::redact(std::move(generated), registry));
-      append_diagnostics(diagnostics, saved.diagnostics);
-      if (!saved.ok()) {
-         return fail_with_diagnostics(diagnostics);
-      }
-      return 0;
-   }
-   if (print_effective_config) {
-      if (!options.allow_print_effective_config) {
-         std::cerr << "error: --print-effective-config is disabled for this daemon\n";
-         return 1;
-      }
-      auto written = fcl::yaml::write_document(fcl::config::redact(effective, registry));
-      append_diagnostics(diagnostics, written.diagnostics);
-      if (!written.ok()) {
-         return fail_with_diagnostics(diagnostics);
-      }
-      std::cout << written.text;
-      return 0;
-   }
-   if (check_config) {
-      if (!options.allow_check_config) {
-         std::cerr << "error: --check-config is disabled for this daemon\n";
-         return 1;
-      }
+   if (daemon_cli.help) {
       try {
-         app->configure(effective);
+         const auto context = context_from_document(options, fcl::config::merge({daemon_defaults, daemon_cli.document}));
+         auto app = make_app(context);
+         if (!app) {
+            std::cerr << "error: daemon factory returned null application\n";
+            return 1;
+         }
+         std::cout << daemon_help(options, app->describe_config());
+         return 0;
+      } catch (const std::exception& error) {
+         return fail_with_bootstrap_diagnostic(diagnostics, error);
+      }
+   }
+
+   try {
+      auto early_process_env =
+         read_process_env_layer(daemon_only_registry, options, fcl::env::unknown_variable_policy::ignore, diagnostics);
+      if (has_errors(diagnostics)) {
+         return fail_with_diagnostics(diagnostics);
+      }
+
+      auto early_without_yaml = fcl::config::merge({daemon_defaults, early_process_env, daemon_cli.document});
+      auto early_context = context_from_document(options, early_without_yaml);
+      auto yaml = options.read_yaml ? read_yaml_layer(
+                                         early_context.config_path,
+                                         daemon_cli.config_explicit && !daemon_cli.configure && !daemon_cli.help,
+                                         diagnostics)
+                                    : fcl::config::document{};
+      if (has_errors(diagnostics)) {
+         return fail_with_diagnostics(diagnostics);
+      }
+
+      auto early_paths = resolve_daemon_paths(
+         fcl::config::merge({daemon_defaults, yaml, early_process_env, daemon_cli.document}), options);
+      auto early_path_context = context_from_document(options, early_paths);
+      auto early_dotenv = read_dotenv_layer(
+         early_path_context.dotenv_path,
+         daemon_only_registry,
+         options,
+         daemon_cli.dotenv_explicit && !daemon_cli.configure && !daemon_cli.help,
+         diagnostics);
+      if (has_errors(diagnostics)) {
+         return fail_with_diagnostics(diagnostics);
+      }
+
+      auto early_effective = resolve_daemon_paths(
+         fcl::config::merge({daemon_defaults, yaml, early_dotenv, early_process_env, daemon_cli.document}), options);
+      auto context = context_from_document(options, early_effective);
+      auto app = make_app(context);
+      if (!app) {
+         std::cerr << "error: daemon factory returned null application\n";
+         return 1;
+      }
+
+      const auto app_registry = app->describe_config();
+      auto registry = full_registry(app_registry);
+
+      auto dotenv = read_dotenv_layer(
+         context.dotenv_path,
+         registry,
+         options,
+         daemon_cli.dotenv_explicit && !daemon_cli.configure && !daemon_cli.help,
+         diagnostics);
+      auto process_env =
+         read_process_env_layer(registry, options, fcl::env::unknown_variable_policy::warn, diagnostics);
+      auto product_cli = read_product_cli_layer(daemon_cli.filtered_args, app_registry, options, diagnostics);
+      if (has_errors(diagnostics)) {
+         return fail_with_diagnostics(diagnostics);
+      }
+
+      auto effective = resolve_daemon_paths(
+         fcl::config::merge({
+            fcl::config::defaults_for(registry),
+            daemon_defaults,
+            yaml,
+            dotenv,
+            process_env,
+            daemon_cli.document,
+            product_cli,
+         }),
+         options);
+
+      const auto help = bool_field(effective, "daemon.help", false);
+      const auto check_config = bool_field(effective, "daemon.check-config", false);
+      const auto print_effective_config = bool_field(effective, "daemon.print-effective-config", false);
+      const auto configure = bool_field(effective, "daemon.configure", false);
+
+      if (help) {
+         std::cout << daemon_help(options, app_registry);
+         return 0;
+      }
+      if (configure) {
+         if (!options.allow_configure) {
+            std::cerr << "error: --configure is disabled for this daemon\n";
+            return 1;
+         }
+         const auto config_path = string_field(effective, "daemon.config", context.config_path.string());
+         if (std::filesystem::exists(config_path)) {
+            std::cerr << "error: refusing to overwrite existing config: " << config_path << '\n';
+            return 1;
+         }
+         const auto parent = std::filesystem::path{config_path}.parent_path();
+         if (!parent.empty()) {
+            std::filesystem::create_directories(parent);
+         }
+         auto generated =
+            fcl::config::merge({fcl::config::defaults_for(registry), daemon_defaults, early_process_env,
+                                daemon_cli.document});
+         reset_daemon_action_flags(generated);
+         generated = resolve_daemon_paths(std::move(generated), options);
+         auto saved = fcl::yaml::save_document(config_path, fcl::config::redact(std::move(generated), registry));
+         append_diagnostics(diagnostics, saved.diagnostics);
+         if (!saved.ok()) {
+            return fail_with_diagnostics(diagnostics);
+         }
+         return 0;
+      }
+      if (print_effective_config) {
+         if (!options.allow_print_effective_config) {
+            std::cerr << "error: --print-effective-config is disabled for this daemon\n";
+            return 1;
+         }
+         auto written = fcl::yaml::write_document(fcl::config::redact(effective, registry));
+         append_diagnostics(diagnostics, written.diagnostics);
+         if (!written.ok()) {
+            return fail_with_diagnostics(diagnostics);
+         }
+         std::cout << written.text;
+         return 0;
+      }
+      if (check_config) {
+         if (!options.allow_check_config) {
+            std::cerr << "error: --check-config is disabled for this daemon\n";
+            return 1;
+         }
+         try {
+            app->configure(effective);
+         } catch (const std::exception& error) {
+            std::cerr << "error: " << error.what() << '\n';
+            return 1;
+         }
+         return 0;
+      }
+
+      auto run_options = options.run;
+      apply_run_options_from_document(run_options, effective);
+      try {
+         return fcl::app::run_application(std::move(app), effective, std::move(run_options));
       } catch (const std::exception& error) {
          std::cerr << "error: " << error.what() << '\n';
          return 1;
       }
-      return 0;
-   }
-
-   auto run_options = options.run;
-   apply_run_options_from_document(run_options, effective);
-   try {
-      return fcl::app::run_application(std::move(app), effective, std::move(run_options));
    } catch (const std::exception& error) {
-      std::cerr << "error: " << error.what() << '\n';
-      return 1;
+      return fail_with_bootstrap_diagnostic(diagnostics, error);
    }
 }
 
