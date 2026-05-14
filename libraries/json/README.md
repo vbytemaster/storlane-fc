@@ -104,6 +104,11 @@ print the FCL diagnostic path, code and message instead of exposing parser
 implementation details:
 
 ```cpp
+#include <iostream>
+
+import fcl.json;
+
+auto parsed = fcl::json::read_value("{invalid json");
 for (const auto& diagnostic : parsed.diagnostics) {
    std::cerr << diagnostic.path << " [" << diagnostic.code << "] "
              << diagnostic.message << "\n";
