@@ -9,6 +9,7 @@ export module fcl.app.application_shell;
 
 import fcl.asio.runtime;
 import fcl.asio.task_scheduler;
+import fcl.api;
 import fcl.config;
 import fcl.app.application;
 import fcl.app.diagnostics;
@@ -28,11 +29,13 @@ struct application_shell_options {
 class application_context {
  public:
    application_context(fcl::asio::runtime& runtime, fcl::asio::task_scheduler& scheduler, port_registry& ports,
-                       signal_bus& signals, event_bus& events, diagnostics_store& diagnostics);
+                       fcl::api::registry& apis, signal_bus& signals, event_bus& events,
+                       diagnostics_store& diagnostics);
 
    [[nodiscard]] fcl::asio::runtime& runtime() noexcept;
    [[nodiscard]] fcl::asio::task_scheduler& scheduler() noexcept;
    [[nodiscard]] port_registry& ports() noexcept;
+   [[nodiscard]] fcl::api::installer apis() noexcept;
    [[nodiscard]] signal_bus& signals() noexcept;
    [[nodiscard]] event_bus& events() noexcept;
    [[nodiscard]] diagnostics_store& diagnostics() noexcept;
@@ -41,6 +44,7 @@ class application_context {
    fcl::asio::runtime* runtime_ = nullptr;
    fcl::asio::task_scheduler* scheduler_ = nullptr;
    port_registry* ports_ = nullptr;
+   fcl::api::registry* apis_ = nullptr;
    signal_bus* signals_ = nullptr;
    event_bus* events_ = nullptr;
    diagnostics_store* diagnostics_ = nullptr;
@@ -77,6 +81,7 @@ class application_shell : public application_base {
    [[nodiscard]] fcl::asio::runtime& runtime() noexcept;
    [[nodiscard]] fcl::asio::task_scheduler& scheduler() noexcept;
    [[nodiscard]] port_registry& ports() noexcept;
+   [[nodiscard]] fcl::api::registry& apis() noexcept;
    [[nodiscard]] signal_bus& signals() noexcept;
    [[nodiscard]] event_bus& events() noexcept;
    [[nodiscard]] diagnostics_store& diagnostics() noexcept;

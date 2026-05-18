@@ -481,6 +481,40 @@ boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& con
 auto clock = context.ports().get<clock_port>();
 ```
 
+## APIs
+
+For new plugin-to-plugin contracts, prefer `fcl_api`: the application publishes
+an implementation during install phase, and plugins receive a read-only API view
+during runtime. This keeps lifecycle in `fcl_app` and contract/version/error
+semantics in `fcl_api`.
+
+```cpp
+class cache {
+ public:
+   virtual ~cache() = default;
+   virtual boost::asio::awaitable<models::chunk> read(protocol::read_chunk request) = 0;
+
+   static fcl::api::descriptor describe() {
+      return fcl::api::contract<cache>({.id = {"cache"}, .version = {1, 8}})
+         .method<&cache::read, protocol::read_chunk, models::chunk>("read")
+         .build();
+   }
+};
+
+boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+   context.apis().install<cache>(cache::describe(), std::make_shared<rocks_cache>());
+   co_return;
+}
+
+boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+   cache_ = context.apis().get<cache>({.id = {"cache"}, .major = 1, .min_revision = 8});
+   co_return;
+}
+```
+
+Do not use APIs as lifecycle modules. A plugin owns behavior/lifecycle; an API is
+the typed contract exposed by that plugin or application.
+
 ## Events And Diagnostics
 
 Events are for operator visibility. Diagnostics preserve lifecycle state and
@@ -551,6 +585,8 @@ boost::asio::awaitable<void> run_runtime(fcl::app::application_runtime& runtime)
   a shell.
 - Do not manually instantiate plugins in product startup code when
   `application_shell` can own the registry.
+- Do not use ports/APIs as fake plugins. Plugins own lifecycle and behavior;
+  ports/APIs expose typed contracts.
 - Do not configure plugin options from `build_plugins()`; plugin config belongs
   to `plugin::describe_config()` and `plugin::configure(component_view)`.
 - Do not parse `argv` or backend parser objects inside plugins.

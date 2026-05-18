@@ -19,6 +19,8 @@ target_include_directories(fcl_app PUBLIC ${FCL_PUBLIC_INCLUDE_DIRS})
 
 target_link_libraries(
    fcl_app PUBLIC
+      fcl_exception
+      fcl_api
       fcl_asio
       fcl_config
       fcl_env

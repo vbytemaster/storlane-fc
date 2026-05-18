@@ -18,8 +18,11 @@
 
 import fcl.asio.blocking;
 import fcl.asio.runtime;
+import fcl.api;
+import fcl.p2p.api;
 import fcl.p2p.codec;
 import fcl.p2p.errors;
+import fcl.p2p.exceptions;
 import fcl.p2p.identity;
 import fcl.p2p.message;
 import fcl.p2p.node;
@@ -27,11 +30,13 @@ import fcl.p2p.options;
 import fcl.p2p.peer_store;
 import fcl.p2p.protocol;
 import fcl.p2p.relay;
+import fcl.p2p.session;
 import fcl.quic.endpoint;
 import fcl.quic.framed_stream;
 import fcl.quic.listener;
 import fcl.quic.options;
 import fcl.quic.security;
+import fcl.quic.stream;
 
 namespace fcl::p2p {
 namespace {
@@ -190,6 +195,25 @@ BOOST_AUTO_TEST_CASE(p2p_identity_uses_certificate_fingerprint_shape) {
 
    BOOST_TEST(valid_peer_id(id));
    BOOST_TEST(id.value.size() == 64U);
+}
+
+BOOST_AUTO_TEST_CASE(p2p_api_binding_enforces_known_peer_policy_before_reading_frames) {
+   auto runtime = fcl::asio::runtime{};
+   auto owner = node{runtime, options_for(peer(12))};
+   auto apis = fcl::api::registry{};
+   auto binding = fcl::p2p::api(owner)
+                      .use(fcl::api::binding().serve(apis).build())
+                      .peer_policy(api_peer_policy{.require_known_peer = true})
+                      .build();
+
+   auto incoming = incoming_protocol_stream{
+       .session = session_info{.remote_peer = peer(13)},
+       .protocol = binding.protocol(),
+       .stream = fcl::quic::framed_stream{fcl::quic::stream{}},
+   };
+
+   BOOST_CHECK_THROW(fcl::asio::blocking::run(runtime, binding.accept(std::move(incoming))),
+                     fcl::p2p::exceptions::peer_not_found);
 }
 
 BOOST_AUTO_TEST_CASE(p2p_codec_rejects_wrong_version_and_oversized_envelope) {
