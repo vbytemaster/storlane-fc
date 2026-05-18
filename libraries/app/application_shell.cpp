@@ -101,10 +101,10 @@ void publish_application_event(event_bus& events, event_severity severity, std::
 } // namespace
 
 application_context::application_context(fcl::asio::runtime& runtime, fcl::asio::task_scheduler& scheduler,
-                                         port_registry& ports, signal_bus& signals, event_bus& events,
-                                         diagnostics_store& diagnostics)
-    : runtime_{&runtime}, scheduler_{&scheduler}, ports_{&ports}, signals_{&signals}, events_{&events},
-      diagnostics_{&diagnostics} {}
+                                         port_registry& ports, fcl::api::registry& apis, signal_bus& signals,
+                                         event_bus& events, diagnostics_store& diagnostics)
+    : runtime_{&runtime}, scheduler_{&scheduler}, ports_{&ports}, apis_{&apis}, signals_{&signals},
+      events_{&events}, diagnostics_{&diagnostics} {}
 
 fcl::asio::runtime& application_context::runtime() noexcept {
    return *runtime_;
@@ -116,6 +116,10 @@ fcl::asio::task_scheduler& application_context::scheduler() noexcept {
 
 port_registry& application_context::ports() noexcept {
    return *ports_;
+}
+
+fcl::api::installer application_context::apis() noexcept {
+   return fcl::api::installer{*apis_};
 }
 
 signal_bus& application_context::signals() noexcept {
@@ -143,7 +147,7 @@ fcl::config::component_view configure_context::view(std::string section) const {
 struct application_shell::impl {
    explicit impl(application_shell_options input)
        : options{std::move(input)}, runtime{options.runtime}, scheduler{runtime, options.scheduler},
-         context{runtime, scheduler, ports, signals, events, diagnostics} {}
+         context{runtime, scheduler, ports, apis, signals, events, diagnostics} {}
 
    void require_created(const char* operation) const {
       if (state != application_state::created) {
@@ -155,6 +159,7 @@ struct application_shell::impl {
    fcl::asio::runtime runtime;
    fcl::asio::task_scheduler scheduler;
    port_registry ports;
+   fcl::api::registry apis;
    signal_bus signals;
    event_bus events;
    diagnostics_store diagnostics;
@@ -202,7 +207,8 @@ void application_shell::instantiate_plugins(const fcl::config::document& documen
    impl_->plugin_runtime.reset();
    impl_->plugin_context_value.reset();
    impl_->plugin_context_value =
-       std::make_unique<plugin_context>(impl_->scheduler, impl_->ports, impl_->signals, impl_->events, &impl_->diagnostics);
+       std::make_unique<plugin_context>(impl_->scheduler, impl_->ports, impl_->apis, impl_->signals, impl_->events,
+                                        &impl_->diagnostics);
    impl_->plugin_runtime = std::make_unique<application_runtime>(
       *impl_->plugin_context_value,
       impl_->registry.instantiate_enabled(plugin_selection_from_document(impl_->registry, document)),
@@ -218,7 +224,7 @@ fcl::config::component_registry application_shell::collect_config() {
    }
 
    auto plugin_context_value =
-       plugin_context{impl_->scheduler, impl_->ports, impl_->signals, impl_->events, &impl_->diagnostics};
+       plugin_context{impl_->scheduler, impl_->ports, impl_->apis, impl_->signals, impl_->events, &impl_->diagnostics};
    auto plugin_runtime = application_runtime{
       plugin_context_value,
       impl_->registry.instantiate_enabled(enabled_config_for_all_plugins(impl_->registry)),
@@ -361,6 +367,10 @@ fcl::asio::task_scheduler& application_shell::scheduler() noexcept {
 
 port_registry& application_shell::ports() noexcept {
    return impl_->ports;
+}
+
+fcl::api::registry& application_shell::apis() noexcept {
+   return impl_->apis;
 }
 
 signal_bus& application_shell::signals() noexcept {

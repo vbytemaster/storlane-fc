@@ -22,6 +22,7 @@
 #include <vector>
 
 import fcl.app;
+import fcl.api;
 import fcl.asio.blocking;
 import fcl.asio.runtime;
 import fcl.asio.task_scheduler;
@@ -30,9 +31,32 @@ import fcl.schema;
 
 namespace {
 
+struct lifecycle_log {
+   std::vector<std::string> entries;
+};
+
 struct sample_port {
    virtual ~sample_port() = default;
    virtual int value() const = 0;
+};
+
+class sample_api {
+ public:
+   virtual ~sample_api() = default;
+   virtual boost::asio::awaitable<int> value(int input) = 0;
+
+   static fcl::api::descriptor describe() {
+      return fcl::api::contract<sample_api>({.id = {"sample"}, .version = {.major = 1, .revision = 0}})
+          .method<&sample_api::value, int, int>("value")
+          .build();
+   }
+};
+
+class sample_api_impl final : public sample_api {
+ public:
+   boost::asio::awaitable<int> value(int input) override {
+      co_return input + 1;
+   }
 };
 
 class sample_port_impl final : public sample_port {
@@ -47,8 +71,35 @@ class sample_port_impl final : public sample_port {
    int value_ = 0;
 };
 
-struct lifecycle_log {
-   std::vector<std::string> entries;
+class sample_api_consumer_plugin final : public fcl::app::plugin {
+ public:
+   sample_api_consumer_plugin(lifecycle_log& log) : log_{&log} {}
+
+   fcl::app::plugin_id id() const override {
+      return fcl::app::plugin_id{.value = "api-consumer"};
+   }
+
+   std::string version() const override {
+      return "1";
+   }
+
+   boost::asio::awaitable<void> initialize(fcl::app::plugin_context& context) override {
+      api_ = context.apis().get<sample_api>({.id = {"sample"}, .major = 1});
+      log_->entries.push_back("api.initialize:" + std::to_string(static_cast<bool>(api_)));
+      co_return;
+   }
+
+   boost::asio::awaitable<void> startup() override {
+      co_return;
+   }
+
+   boost::asio::awaitable<void> shutdown() override {
+      co_return;
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+   fcl::api::handle<sample_api> api_;
 };
 
 struct slow_shutdown_state {
@@ -565,6 +616,30 @@ class shell_test_application final : public fcl::app::application_shell {
    std::uint16_t workers_ = 0;
 };
 
+class shell_api_application final : public fcl::app::application_shell {
+ public:
+   explicit shell_api_application(lifecycle_log& log) : log_{&log} {}
+
+ protected:
+   void on_register_plugins(fcl::app::plugin_registry& registry) override {
+      registry.register_plugin(fcl::app::plugin_descriptor{
+         .id = fcl::app::plugin_id{.value = "api-consumer"},
+         .factory = [this] {
+            return std::make_unique<sample_api_consumer_plugin>(*log_);
+         },
+      });
+   }
+
+   boost::asio::awaitable<void> on_install_ports(fcl::app::application_context& context) override {
+      context.apis().install<sample_api>(sample_api::describe(), std::make_shared<sample_api_impl>());
+      log_->entries.push_back("app.install_api");
+      co_return;
+   }
+
+ private:
+   lifecycle_log* log_ = nullptr;
+};
+
 class shell_order_application final : public fcl::app::application_shell {
  public:
    explicit shell_order_application(lifecycle_log& log) : log_{&log} {}
@@ -1033,6 +1108,22 @@ BOOST_AUTO_TEST_CASE(application_shell_owns_config_plugin_lifecycle_and_context)
       "plugin.shutdown",
    };
    BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+}
+
+BOOST_AUTO_TEST_CASE(application_shell_publishes_api_before_plugin_initialize) {
+   auto log = lifecycle_log{};
+   auto app = shell_api_application{log};
+
+   fcl::asio::blocking::run(app.runtime(), app.initialize());
+
+   const auto expected = std::vector<std::string>{
+      "app.install_api",
+      "api.initialize:1",
+   };
+   BOOST_TEST(log.entries == expected, boost::test_tools::per_element());
+   BOOST_TEST(app.apis().describe({.id = {"sample"}, .major = 1}) != nullptr);
+
+   fcl::asio::blocking::run(app.runtime(), app.shutdown());
 }
 
 BOOST_AUTO_TEST_CASE(application_shell_preserves_dependency_order_and_reverse_shutdown) {

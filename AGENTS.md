@@ -41,6 +41,7 @@ The repository must stay neutral. Public APIs must not contain downstream produc
   - `fcl_yaml`
   - `fcl_program_options`
   - `fcl_json`
+  - `fcl_api`
   - `fcl_crypto`
   - `fcl_runtime`
   - `fcl_log`
@@ -90,8 +91,15 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 
 ## Errors And Logging
 
-- FCL errors are `std`-based and support structured context through `fcl::error::context_error`.
-- Use `FCL_THROW`, `FCL_ASSERT`, deadline checks and capture/log helpers with explicit `fcl::error::ctx(...)` or `fcl::error::secret(...)` fields.
+- FCL exceptions are `std`-based and support typed categories through
+  `fcl::exception::coded_exception<Enum, Value>` plus structured redacted
+  context through `fcl::exception::context_error`.
+- Public FCL/app/network/API boundary failures should use typed exceptions
+  under `fcl::{lib}::exceptions::*`, without `_exception` suffix.
+- `FCL_THROW_EXCEPTION(ExceptionType, ...)` is the canonical typed throw macro.
+- Use `FCL_THROW`, `FCL_ASSERT`, deadline checks and capture/log helpers with explicit `fcl::exception::ctx(...)` or `fcl::exception::secret(...)` fields.
+- `fcl::error` is only a temporary compatibility alias; new code and docs should
+  use `fcl::exception`.
 - The old FC exception hierarchy, old declare/throw macros and variant-backed exception serialization are removed and must not reappear.
 - Context capture must preserve source location and redact secret fields.
 - Logging core should stay small: console/file/JSONL-style sinks and structured fields.
@@ -124,6 +132,20 @@ The repository must stay neutral. Public APIs must not contain downstream produc
 - Boost.Asio and Boost.Beast are valid dependencies for future runtime and network targets.
 - Legacy networking code from the old codebase must not define the new network API.
 - The network family is a set of independent root libraries: `fcl_http`, `fcl_websocket`, `fcl_quic`, and `fcl_p2p`.
+- `fcl_api` is the neutral typed contract layer used by app/network bindings; it
+  must not import `fcl_app`, `fcl_http`, `fcl_websocket`, `fcl_quic` or
+  `fcl_p2p`.
+- HTTP API bindings must preserve native HTTP route/path/status semantics; do
+  not force all APIs into a frame-only `POST /rpc` model.
+- WebSocket, QUIC and P2P API bindings use `fcl::api::frame` and the shared
+  `fcl::api::error_payload`; protocol-specific duplicate error DTOs are
+  forbidden.
+- API binding builders must not expose decorative options. Every public option
+  such as codec, frame size, max inflight, deadline, peer policy or middleware
+  must affect runtime behavior and be covered by tests.
+- HTTP-specific middleware belongs to `fcl.http.api`/router composition.
+  Protocol-neutral trace/authz/metrics/limits logic belongs to
+  `fcl::api::interceptor(...)`.
 - Do not create `libraries/network`, legacy net-prefixed target, module, or namespace forms.
 - Runtime workers must have explicit cancellation, bounded queues where needed, and deterministic shutdown.
 - Do not introduce `std::async`, ad hoc polling loops, or unmanaged background threads as core runtime behavior.
@@ -136,8 +158,10 @@ The repository must stay neutral. Public APIs must not contain downstream produc
   members into every product application.
 - `application_shell` owns lifecycle order: collect app and plugin config,
   merge defaults with input document, configure app hook, configure plugins,
-  install app ports, initialize plugins, startup plugins, request stop and
+  install app ports/APIs, initialize plugins, startup plugins, request stop and
   reverse shutdown.
+- Plugins own behavior and lifecycle. Ports/APIs expose typed contracts; they
+  must not become fake lifecycle modules.
 - Plugin enable/disable is application-shell-owned config under
   `plugins.<plugin-id>.enabled`. Products must not manually distribute plugin
   selection from their own monolithic config object as the primary path.

@@ -65,6 +65,44 @@ node.register_protocol_handler(fcl::p2p::protocol_id{.value = "/example/1"}, [](
 });
 ```
 
+### Register A Typed API Protocol
+
+`fcl.p2p.api` builds a protocol handler artifact. The node remains a P2P
+transport owner; API sessions are surfaced by the binding. The binding validates
+the negotiated protocol id, optional peer policy, configured codec and per-peer
+max inflight calls before product handlers run.
+
+```cpp
+import fcl.api;
+import fcl.p2p.api;
+
+auto plan = fcl::api::binding()
+   .serve(app.apis())
+   .export_api<peer_index>({.id = {"peer.index"}, .major = 1, .min_revision = 2})
+   .require_peer_api<client_session>({.id = {"client.session"}, .major = 1})
+   .build();
+
+auto binding = fcl::p2p::api(node)
+   .use(plan)
+   .protocol_id("/fcl/api/1")
+   .codec({"fcl.raw"})
+   .peer_policy({.require_known_peer = true})
+   .discovery_scope({.value = "storage"})
+   .max_inflight_per_peer(64)
+   .build();
+
+binding.on_session([](fcl::api::session& session) -> boost::asio::awaitable<void> {
+   auto client = session.view().get<client_session>({.id = {"client.session"}, .major = 1});
+   co_await client->notify(protocol::peer_ready{});
+});
+
+node.register_protocol_handler(binding.protocol(), binding.handler());
+```
+
+The binding handles a continuous framed API session over the accepted P2P
+protocol stream. It does not own peer identity, relay, hole punching, peer-store
+lifecycle or node bootstrap; those stay on `fcl::p2p::node`.
+
 ### Connect And Open A Protocol Stream
 
 ```cpp
@@ -140,6 +178,16 @@ failure and invalid envelopes are correctness failures.
   policy. Relay use must be explicit and visible to the caller.
 - Do not put durable delivery, exactly-once semantics or storage guarantees in
   `fcl_p2p`; protocols above P2P own those contracts.
+- Do not define a new P2P-only API error payload. API protocols use
+  `fcl::api::error_payload` in `fcl::api::frame` error responses.
+- Do not let protocol handler exceptions disappear in detached tasks. Expected
+  product failures should be typed exceptions and unexpected failures should be
+  counted/diagnosed.
+- Do not treat `.peer_policy(...)` or `.max_inflight_per_peer(...)` as cosmetic.
+  Unknown peers and too many active API calls are rejected before product API
+  handlers run.
+- Do not make `fcl.p2p.api` responsible for peer discovery, relay or node
+  lifecycle. It is only the API protocol binding artifact.
 
 ## Typical Mistakes
 

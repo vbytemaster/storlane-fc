@@ -10,7 +10,10 @@ FCL.
 - Module-first public API under `libraries/<lib>/include/fcl/<lib>/*.cppm`.
 - Boost.Describe as canonical reflection metadata.
 - `fcl_raw` byte compatibility for retained old FC wire layouts.
-- Std-based exception context instead of old exception hierarchy.
+- Typed `fcl_exception` categories plus redacted context instead of old
+  exception hierarchy.
+- Neutral `fcl_api` contracts for in-process plugin APIs and transport API
+  bindings.
 - Std chrono instead of old FC time aliases.
 - Glaze-backed JSON/YAML codec API.
 - Async app/runtime stack over Boost.Asio.
@@ -27,6 +30,8 @@ FCL.
 
 - [Runtime + App](runtime/asio-app.md): runtime ownership, scheduler,
   backpressure and async plugin lifecycle.
+- [API Contracts](../libraries/api/README.md): typed handles, descriptor
+  builders, API frames and shared error payloads.
 - [HTTP + WebSocket](web/http-websocket.md): web/control-plane substrate,
   routing, middleware, upgrades and retry boundaries.
 - [QUIC + P2P](network/quic-p2p.md): secure transport, peer identity, protocol
